@@ -1,0 +1,15 @@
+{
+  "name": "api-table-viewer",
+  "version": "1.4.13",
+  "private": true,
+  "description": "Chrome DevTools JSON response table and integrated JSON viewer",
+  "license": "UNLICENSED",
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "test": "node tests/regression.cjs && node tests/package-check.cjs",
+    "test:regression": "node tests/regression.cjs",
+    "test:package": "node tests/package-check.cjs"
+  }
+}

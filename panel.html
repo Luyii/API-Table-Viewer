@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>API Table Viewer</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="app">
+  <header class="topbar">
+    <div class="brand"><span class="logo">▦</span><span>API Table Viewer</span></div>
+    <button id="toggleSidebar" class="btn ghost" aria-controls="requestSidebar" aria-expanded="true" title="收起左侧接口列表">收起列表</button>
+    <div class="toolbar">
+      <input id="searchInput" class="search" placeholder="搜索接口 URL / 路径..." />
+      <button id="clearBtn" class="btn ghost">清空</button>
+    </div>
+  </header>
+
+  <div class="workspace">
+    <aside id="requestSidebar" class="sidebar">
+      <div class="side-title"><span>Network 接口</span><span id="requestCount" class="count">0</span><button id="closeSidebar" class="icon-btn" aria-label="收起接口列表" title="收起接口列表">×</button></div>
+      <div class="request-filters">
+        <select id="methodFilter" aria-label="筛选请求方法"><option value="">全部方法</option><option>GET</option><option>POST</option><option>PUT</option><option>PATCH</option><option>DELETE</option><option>OPTIONS</option><option>HEAD</option></select>
+        <select id="statusFilter" aria-label="筛选状态码"><option value="">全部状态</option><option value="2">2xx 成功</option><option value="3">3xx 重定向</option><option value="4">4xx 客户端错误</option><option value="5">5xx 服务端错误</option><option value="0">其他 / 失败</option></select>
+        <label><input type="checkbox" id="preserveLog"> 保留导航记录</label>
+      </div>
+      <div id="requestList" class="request-list">
+        <div class="empty">打开 DevTools 后刷新页面<br>等待 JSON 接口请求</div>
+      </div>
+    </aside>
+
+    <div id="sidebarResizer" class="sidebar-resizer" role="separator" tabindex="0" aria-orientation="vertical" aria-label="调整接口列表宽度" aria-controls="requestSidebar" title="左右拖动调整宽度；双击恢复默认宽度"></div>
+
+    <main class="main">
+      <div id="emptyState" class="main-empty">
+        <div class="empty-icon">⌁</div>
+        <div class="empty-title">选择一个 JSON 接口</div>
+        <div class="empty-sub">从左侧 Network 请求中选择接口</div>
+      </div>
+
+      <section id="detail" class="detail hidden">
+        <div class="request-head">
+          <div class="request-info">
+            <span id="methodBadge" class="method">GET</span>
+            <span id="statusBadge" class="status">200</span>
+            <span id="urlText" class="url" title=""></span>
+          </div>
+          <div class="head-actions">
+            <button id="copyCurlBtn" class="btn ghost" title="复制 Bash / WSL / Git Bash 格式的 cURL">复制 cURL</button>
+            <button id="downloadResponseBtn" class="btn ghost">下载 JSON</button>
+            <button id="copyUrlBtn" class="btn ghost">复制 URL</button>
+            <button id="copyRawBtn" class="btn">复制 JSON</button>
+          </div>
+        </div>
+
+        <div class="tabs">
+          <button class="tab active" data-tab="tree">数据结构</button>
+          <button class="tab" data-tab="table">Table <span id="tableBadge" class="tab-badge"></span></button>
+          <button class="tab" data-tab="raw">Raw JSON</button>
+          <button class="tab" data-tab="request">请求详情</button>
+        </div>
+
+        <div id="treePanel" class="panel">
+          <div class="subtoolbar">
+            <button id="expandRootBtn" class="btn">展开 / 收起根节点</button>
+            <button id="arrayPathsBtn" class="btn">数组路径</button>
+            <span id="treeHint" class="hint"></span>
+          </div>
+          <div id="tree" class="tree"></div>
+        </div>
+
+        <div id="tablePanel" class="panel hidden">
+          <div class="table-toolbar">
+            <div class="table-path" id="tablePath">未选择数组</div>
+            <input id="tableSearch" class="search table-search" placeholder="搜索当前表格..." />
+            <button id="prevMatch" class="btn" disabled title="上一个匹配单元格">↑</button>
+            <span id="matchPosition" class="hint">0 / 0</span>
+            <button id="nextMatch" class="btn" disabled title="下一个匹配单元格">↓</button>
+            <select id="pageSizeSelect" aria-label="表格每页条数"><option value="25">25 条 / 页</option><option value="50">50 条 / 页</option><option value="100" selected>100 条 / 页</option><option value="200">200 条 / 页</option></select>
+            <button id="refitColumns" class="btn" title="清除手动列宽，按当前页内容重新适配">适配列宽</button>
+            <details id="columnMenu" class="column-menu"><summary id="columnSummary" class="btn">显示列</summary><div class="column-popover"><div class="column-actions"><button id="showAllColumns" class="btn">显示全部</button><button id="resetColumns" class="btn">仅保留首列</button></div><div id="columnList"></div></div></details>
+            <button id="exportTableJson" class="btn">导出表格 JSON</button>
+            <button id="copyMdBtn" class="btn">复制全部 Markdown</button>
+            <button id="csvBtn" class="btn">导出全部 CSV</button>
+          </div>
+          <div id="tableMeta" class="table-meta"></div>
+          <div class="table-wrap"><table id="dataTable"><colgroup id="tableColumns"></colgroup><thead></thead><tbody></tbody></table></div>
+          <div id="pagination" class="pagination"></div>
+        </div>
+
+        <div id="requestPanel" class="panel hidden"><div class="subtoolbar"><button id="copyRequestBodyBtn" class="btn" disabled>复制请求体 JSON</button></div><div id="requestDetails" class="request-details"></div></div>
+        <div id="rawPanel" class="panel hidden">
+          <div class="raw-toolbar">
+            <span id="rawMeta" class="hint"></span>
+            <div>
+              <button id="showFullRawBtn" class="btn">JSON 查看器</button>
+              <button id="copyRaw2Btn" class="btn">复制 JSON</button>
+            </div>
+          </div>
+          <pre id="rawPreview" class="raw"></pre>
+        </div>
+      </section>
+    </main>
+  </div>
+</div>
+
+<div id="modal" class="modal hidden">
+  <div class="modal-card">
+    <div class="modal-head"><span id="modalTitle">数据详情</span><button id="modalClose" class="icon-btn">×</button></div>
+    <div class="modal-actions"><button id="modalCopy" class="btn">复制</button></div>
+    <div id="viewerToolbar" class="viewer-toolbar hidden">
+      <div class="viewer-controls">
+        <button id="viewerHome" class="btn">返回起点</button>
+        <button id="viewerUp" class="btn">上一级</button>
+        <button id="viewerCollapse" class="btn">收起全部</button>
+        <button id="viewerCopyPath" class="btn">复制路径</button>
+        <button id="viewerDownload" class="btn">下载当前 JSON</button>
+        <button id="viewerFull" class="btn">最大化</button>
+        <input id="viewerQuery" class="search" placeholder="搜索当前起点下的字段和值…">
+        <button id="viewerSearchBtn" class="btn">搜索</button>
+        <button id="viewerPrevMatch" class="btn" disabled title="上一个匹配（Shift+F3）">↑</button><span id="viewerMatchPosition" class="hint">0 / 0</span><button id="viewerNextMatch" class="btn" disabled title="下一个匹配（F3）">↓</button>
+      </div>
+      <div class="viewer-jump"><input id="viewerPathInput" class="search" placeholder='root.data[0]["field.name"]' aria-label="JSON 路径"><button id="viewerJump" class="btn">跳转路径</button></div>
+      <div id="viewerPath" class="viewer-path"></div>
+      <div id="viewerExpansionStatus" class="viewer-expansion-status hidden"><span id="viewerExpansionText"></span></div>
+      <div id="viewerResults" class="viewer-results hidden"></div>
+    </div>
+    <div id="modalContent" class="modal-content"></div>
+  </div>
+</div>
+
+<div id="toast" class="toast"></div>
+<script src="json-codec.js"></script>
+<script src="panel.js"></script>
+<script src="table-ui.js"></script>
+<script src="viewer.js"></script>
+<script src="viewer-expanded.js"></script>
+<script src="developer.js"></script>
+<script src="layout.js"></script>
+<script src="shortcuts.js"></script>
+</body>
+</html>

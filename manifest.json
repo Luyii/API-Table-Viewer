@@ -1,0 +1,7 @@
+{
+  "manifest_version": 3,
+  "name": "API Table Viewer",
+  "version": "1.4.13",
+  "description": "High-performance JSON API response viewer for Chrome DevTools",
+  "devtools_page": "devtools.html"
+}
