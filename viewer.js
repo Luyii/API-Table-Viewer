@@ -13,6 +13,18 @@ async function openJsonViewer(rid,path,title){
   $('#viewerToolbar').classList.remove('hidden');$('#viewerQuery').value='';$('#viewerResults').textContent='';$('#viewerResults').classList.add('hidden');$('#viewerMatchPosition').textContent='0 / 0';$('#viewerPrevMatch').disabled=true;$('#viewerNextMatch').disabled=true;
   await navigateViewer(path);
 }
+function appendViewerContentActions(host,s,path){
+  const bar=document.createElement('div');bar.className='viewer-content-actions';
+  const rid=s.rid,currentPath=[...path];
+  const copy=viewerButton('复制内容',async()=>{
+    const result=await callWorker('valueText',{rid,path:currentPath});
+    return copyText(result.text);
+  });
+  copy.title='复制当前节点的完整内容；文本不含 JSON 引号，分段内容也会完整复制';
+  bar.appendChild(copy);
+  const hint=document.createElement('span');hint.className='hint';hint.textContent='当前节点完整内容';bar.appendChild(hint);
+  host.appendChild(bar);
+}
 async function navigateViewer(path,{targetPath=null,forceLazy=false,collapsed=false,expandAll=false}={}){
   const s=viewerState;if(!s)return;if(typeof releaseViewerExpansion==='function')releaseViewerExpansion(s);const version=++s.version;s.path=[...path];s.focusPath=targetPath?[...targetPath]:null;s.focusRow=null;s.rendered=0;
   setViewerExpandToggle(collapsed);
@@ -40,6 +52,7 @@ async function navigateViewer(path,{targetPath=null,forceLazy=false,collapsed=fa
     await viewerNode(meta,path,root,!collapsed,targetPath);
     if(viewerState===s && s.version===version && s.focusRow)s.focusRow.scrollIntoView({block:"center",inline:"nearest",behavior:"auto"});
   } else if(doc.complete){
+    appendViewerContentActions(host,s,path);
     const text=document.createElement('pre');text.className='viewer-scalar';highlightText(text,doc.text,s.query);host.appendChild(text);
     const mark=text.querySelector('mark');if(mark)mark.scrollIntoView({block:'nearest',inline:'nearest'});
   } else await viewerScalar(path,-1,s,version);
@@ -48,6 +61,7 @@ async function viewerScalar(path,page,s,version){
   const request=s.scalarRequest=(s.scalarRequest||0)+1;
   const data=await callWorker('valuePage',{rid:s.rid,path,page,query:s.query});if(viewerState!==s || s.version!==version || request!==s.scalarRequest)return;
   const host=$('#modalContent');host.textContent='';
+  appendViewerContentActions(host,s,path);
   const text=document.createElement('pre');text.className='viewer-scalar';highlightText(text,data.text,s.query);host.appendChild(text);
   const tools=document.createElement('div');tools.className='viewer-page';
   const prev=viewerButton('上一段',()=>viewerScalar(path,data.page-1,s,version));prev.disabled=data.page===0;

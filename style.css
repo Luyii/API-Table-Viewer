@@ -194,3 +194,8 @@ select{background:#242426;color:#ddd;border:1px solid #444;border-radius:4px;pad
 .table-search-label{margin-left:auto}
 .table-search{margin-left:0;max-width:100%;min-width:80px}
 @media(max-width:700px){.tree-search-controls{flex:1 1 100%;margin-left:0}.tree-search-controls .search{width:auto}.table-search-label{margin-left:0}}
+
+/* Copy stays beside scalar content, including paged long text. */
+#modalContent>.viewer-content-actions{display:flex;flex-direction:row;align-items:center;gap:8px;margin:0 0 8px;padding:6px 0;background:var(--bg);position:sticky;top:0;z-index:1;white-space:normal}
+.viewer-content-actions>.mini-btn{padding:5px 10px;font-size:12px;border-color:#79a8d8;color:#edf6ff;background:#304e70}
+.viewer-content-actions>.mini-btn:hover{background:#3b628b}
