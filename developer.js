@@ -121,3 +121,18 @@ $('#clearBtn').onclick=safe(clearCapturedRequests);
 chrome.devtools.network.onNavigated.addListener(safe(()=>{if(!devPrefs.preserveLog)return clearCapturedRequests();}));
 
 $('#copyRequestBodyBtn').onclick=safe(()=>copyText(requestBodyJsonText(selected)));
+
+// Search the selected response through the existing inspector, with no URL filtering.
+let responseFieldSearchVersion=0;
+async function searchResponseFields(){
+  const requestVersion=++responseFieldSearchVersion;
+  const item=selected,query=$('#treeSearch').value.trim();
+  if(!item?.valid)return;
+  if(!query){$('#treeSearch').focus();return;}
+  await showValue([],'字段 / 值搜索');
+  if(requestVersion!==responseFieldSearchVersion || selected!==item || viewerState?.rid!==item.rid)return;
+  $('#viewerQuery').value=query;
+  return searchViewer(true);
+}
+$('#treeSearchBtn').onclick=safe(searchResponseFields);
+$('#treeSearch').onkeydown=safe(e=>{if(e.key==='Enter' && !e.isComposing){e.preventDefault();return searchResponseFields();}});

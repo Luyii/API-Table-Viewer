@@ -208,6 +208,7 @@ self.onmessage=e=>{
       }
       else if(cmd==='valuePreview')result=valuePreview(getAt(rec.obj,e.data.path));
       else if(cmd==='value')result={text:stringifyJson(getAt(rec.obj,e.data.path),null,2)};
+      else if(cmd==='valueText'){const value=getAt(rec.obj,e.data.path);result={text:typeof value==='string'?value:stringifyJson(value,null,2)};}
       else if(cmd==='rawFull')result={text:rec.raw};
       else if(cmd==='rawPreview') {const max=e.data.max||50000;result={text:rec.raw.slice(0,max),length:rec.raw.length,truncated:rec.raw.length>max};}
       else throw Error('未知命令');

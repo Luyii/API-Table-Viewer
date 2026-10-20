@@ -1,20 +1,25 @@
-// Bounded content-based widths: compact identifiers, roomy text, capped long fields.
+// Content previews are capped; full field names always define the minimum width.
 let tableMeasureContext;
 function measureTableText(value,header=false){
-  const text=String(value??'').slice(0,240);
+  const text=header?String(value??''):String(value??'').slice(0,240);
   if(tableMeasureContext===undefined){try{tableMeasureContext=document.createElement('canvas').getContext?.('2d')||null;}catch{tableMeasureContext=null;}}
-  if(tableMeasureContext){tableMeasureContext.font=header?'600 13px "Segoe UI",Arial,sans-serif':'13px Consolas,Monaco,monospace';return tableMeasureContext.measureText(text).width;}
+  if(tableMeasureContext){tableMeasureContext.font=header?'650 13px "Segoe UI","Microsoft YaHei",sans-serif':'13px Consolas,Monaco,monospace';return tableMeasureContext.measureText(text).width;}
   return [...text].reduce((width,c)=>width+(c.codePointAt(0)>255?13:7.8),0);
+}
+function tableHeaderMinWidth(col){
+  // Padding, sort arrow, gap and resize handle must not cover the field name.
+  return Math.max(88,Math.ceil(measureTableText(col,true))+60);
 }
 function tableColumnWidths(columns,rows){
   return new Map(columns.map(col=>{
-    let width=measureTableText(col,true)+52;
+    const minimum=tableHeaderMinWidth(col);
+    let width=minimum;
     for(const row of rows.slice(0,200)){
       const cell=row[col];if(!cell)continue;
       const extra=cell.expand?55:24;
       width=Math.max(width,measureTableText(cell.text)+extra+(cell.matched?56:0));
     }
-    return [col,Math.min(380,Math.max(88,Math.ceil(width)))];
+    return [col,Math.max(minimum,Math.min(380,Math.ceil(width)))];
   }));
 }
 function tableColumnKind(col,rows){
@@ -48,16 +53,17 @@ function widthState(){
 function resolvedTableWidths(columns,rows){
   const measured=tableColumnWidths(columns,rows),saved=widthState();
   const widths=new Map();
-  for(const col of columns){const auto=Math.max(saved.auto.get(col)||0,measured.get(col));saved.auto.set(col,auto);widths.set(col,saved.manual.get(col)||auto);}
+  for(const col of columns){const auto=Math.max(saved.auto.get(col)||0,measured.get(col));saved.auto.set(col,auto);widths.set(col,Math.max(tableHeaderMinWidth(col),saved.manual.get(col)||auto));}
   currentTableColumns=[...columns];currentTableWidths=widths;currentWidthKey=tableWidthKey();return widths;
 }
 function applyColumnWidth(col,width){
   if(tableWidthKey()!==currentWidthKey)return;
   const index=currentTableColumns.indexOf(col);if(index<0)return;
-  width=Math.max(72,Math.min(960,Math.round(width)));
+  const minimum=tableHeaderMinWidth(col);
+  width=Math.max(minimum,Math.min(Math.max(960,minimum),Math.round(width)));
   widthState().manual.set(col,width);currentTableWidths.set(col,width);
   const column=$('#tableColumns').children[index],head=$('#dataTable thead').children[0]?.children[index];
-  if(column)column.style.width=width+'px';if(head)head.style.width=width+'px';
+  if(column)column.style.width=width+'px';if(head){head.style.width=width+'px';const grip=head.children[head.children.length-1];if(grip?.className==='column-resizer')grip.setAttribute('aria-valuenow',String(width));}
   $('#dataTable').style.width=[...currentTableWidths.values()].reduce((sum,v)=>sum+v,0)+'px';
 }
 function bindColumnResize(th,col){
@@ -71,7 +77,7 @@ function bindColumnResize(th,col){
   grip.onpointerup=finish;grip.onpointercancel=finish;grip.onlostpointercapture=finish;
   grip.ondblclick=safe(e=>{e.preventDefault();e.stopPropagation();widthState().manual.delete(col);widthState().auto.delete(col);return renderTable();});
   grip.onkeydown=e=>{e.stopPropagation();if(!['ArrowLeft','ArrowRight','Home','End'].includes(e.key))return;e.preventDefault();applyColumnWidth(col,e.key==='Home'?88:e.key==='End'?380:(currentTableWidths.get(col)||88)+(e.key==='ArrowLeft'?-16:16));grip.setAttribute('aria-valuenow',String(currentTableWidths.get(col)));};
-  grip.setAttribute('aria-valuemin','72');grip.setAttribute('aria-valuemax','960');grip.setAttribute('aria-valuenow',String(currentTableWidths.get(col)||88));th.appendChild(grip);
+  grip.setAttribute('aria-valuemin',String(tableHeaderMinWidth(col)));grip.setAttribute('aria-valuemax',String(Math.max(960,tableHeaderMinWidth(col))));grip.setAttribute('aria-valuenow',String(currentTableWidths.get(col)||88));th.appendChild(grip);
 }
 async function refitTableColumns(){const state=widthState();state.manual.clear();state.auto.clear();return renderTable();}
 $('#refitColumns').onclick=safe(refitTableColumns);

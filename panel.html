@@ -11,15 +11,18 @@
   <header class="topbar">
     <div class="brand"><span class="logo">▦</span><span>API Table Viewer</span></div>
     <button id="toggleSidebar" class="btn ghost" aria-controls="requestSidebar" aria-expanded="true" title="收起左侧接口列表">收起列表</button>
-    <div class="toolbar">
-      <input id="searchInput" class="search" placeholder="搜索接口 URL / 路径..." />
-      <button id="clearBtn" class="btn ghost">清空</button>
-    </div>
   </header>
 
   <div class="workspace">
     <aside id="requestSidebar" class="sidebar">
       <div class="side-title"><span>Network 接口</span><span id="requestCount" class="count">0</span><button id="closeSidebar" class="icon-btn" aria-label="收起接口列表" title="收起接口列表">×</button></div>
+      <div class="request-search">
+        <label for="searchInput">搜索接口</label>
+        <div class="request-search-controls">
+          <input id="searchInput" class="search" type="search" placeholder="接口 URL / 路径" aria-label="搜索左侧接口 URL 或路径" />
+          <button id="clearBtn" class="btn ghost" title="清空所有已捕获的接口记录">清空记录</button>
+        </div>
+      </div>
       <div class="request-filters">
         <select id="methodFilter" aria-label="筛选请求方法"><option value="">全部方法</option><option>GET</option><option>POST</option><option>PUT</option><option>PATCH</option><option>DELETE</option><option>OPTIONS</option><option>HEAD</option></select>
         <select id="statusFilter" aria-label="筛选状态码"><option value="">全部状态</option><option value="2">2xx 成功</option><option value="3">3xx 重定向</option><option value="4">4xx 客户端错误</option><option value="5">5xx 服务端错误</option><option value="0">其他 / 失败</option></select>
@@ -66,6 +69,11 @@
             <button id="expandRootBtn" class="btn">展开 / 收起根节点</button>
             <button id="arrayPathsBtn" class="btn">数组路径</button>
             <span id="treeHint" class="hint"></span>
+            <div class="tree-search-controls">
+              <label for="treeSearch">搜索字段 / 值</label>
+              <input id="treeSearch" class="search" type="search" placeholder="当前响应的字段名或值" aria-label="搜索当前响应的字段名或值" />
+              <button id="treeSearchBtn" class="btn">搜索定位</button>
+            </div>
           </div>
           <div id="tree" class="tree"></div>
         </div>
@@ -73,7 +81,8 @@
         <div id="tablePanel" class="panel hidden">
           <div class="table-toolbar">
             <div class="table-path" id="tablePath">未选择数组</div>
-            <input id="tableSearch" class="search table-search" placeholder="搜索当前表格..." />
+            <label class="table-search-label" for="tableSearch">搜索字段 / 值</label>
+            <input id="tableSearch" class="search table-search" type="search" placeholder="当前数组的字段名或值" aria-label="搜索当前数组的字段名或值" />
             <button id="prevMatch" class="btn" disabled title="上一个匹配单元格">↑</button>
             <span id="matchPosition" class="hint">0 / 0</span>
             <button id="nextMatch" class="btn" disabled title="下一个匹配单元格">↓</button>
@@ -117,7 +126,7 @@
         <button id="viewerCopyPath" class="btn">复制路径</button>
         <button id="viewerDownload" class="btn">下载当前 JSON</button>
         <button id="viewerFull" class="btn">最大化</button>
-        <input id="viewerQuery" class="search" placeholder="搜索当前起点下的字段和值…">
+        <input id="viewerQuery" class="search" placeholder="当前节点下的字段名或值" aria-label="搜索当前节点下的字段名或值">
         <button id="viewerSearchBtn" class="btn">搜索</button>
         <button id="viewerPrevMatch" class="btn" disabled title="上一个匹配（Shift+F3）">↑</button><span id="viewerMatchPosition" class="hint">0 / 0</span><button id="viewerNextMatch" class="btn" disabled title="下一个匹配（F3）">↓</button>
       </div>

@@ -27,7 +27,7 @@ Chrome DevTools 中的 JSON 接口调试扩展：把数组转换为表格，用�
 | 布局 | 左侧列表独立收起、拖动调宽、记住布局和分页偏好 |
 | 数值 | 普通整数字面量超出安全整数范围时仍精确保留，支持搜索、排序与导出 |
 
-表格自适应指**列宽**：自动宽度 88–380 px，手动拖动 72–960 px。长内容不会持续撑高单元格。隐藏列仅影响屏幕显示，导出仍包含全部字段。
+表格自适应指**列宽**：内容自动宽度通常为 88–380 px，手动宽度通常最高 960 px；完整表头字段名单行所需宽度始终作为下限，超长表头可突破上述上限，通过表格横向滚动查看。长内容不会持续撑高单元格。隐藏列仅影响屏幕显示，导出仍包含全部字段。
 
 ## 快捷键
 
@@ -61,7 +61,7 @@ Windows 可用 `py scripts/package.py`。扩展安装本身不需要 Node.js 或
 
 打包产物位于 `dist/API-Table-Viewer-v1.4.13.zip`，解压根目录直接包含清单。源码无需构建即可作为已解压扩展加载。
 
-当前 **73 项回归测试及静态包检查通过**。测试使用真实 Worker 逻辑与模拟 DOM / DevTools；尚未完成真实 Chrome 安装、视觉布局、系统快捷键、剪贴板和下载界面的验证。见 [测试说明](docs/TESTING.md) 与 [本次检查报告](CHECK_REPORT.md)。
+自动检查覆盖 78 项回归、扩展资源与脚本检查，以及本地接口联动。命令和覆盖范围见 [测试说明](docs/TESTING.md)，版本修复见 [检查记录](CHECK_REPORT.md)。
 
 ## 文档
 
@@ -81,4 +81,4 @@ Windows 可用 `py scripts/package.py`。扩展安装本身不需要 Node.js 或
 
 ## 本地 Chrome 复现环境
 
-执行 `npm run test:manual`，打开 http://127.0.0.1:8765 ，在 API Table 面板打开后发送案例。无需安装依赖；完整数据说明、逐项验收和真实执行记录见 [Chrome 复现指南](docs/CHROME_REPRO.md)。`npm run test:fixtures` 检查 HTTP 数据与真实 Worker 联动，不代表 Chrome 实机通过。
+执行 `npm run test:manual`，打开 http://127.0.0.1:8765 ，在 API Table 面板打开后发送案例。无需安装依赖；数据说明和操作步骤见 [Chrome 复现指南](docs/CHROME_REPRO.md)。`npm run test:fixtures` 检查 HTTP 接口数据与 Worker 联动。

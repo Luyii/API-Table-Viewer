@@ -53,9 +53,8 @@ DevTools 的请求完成事件以及初始 `getHAR` 补录读取响应正文，�
 ## 发布
 
 1. 功能变更同步 `manifest.json`、`package.json` 与更新记录。
-2. 运行 `npm test`，再在真实 Chrome 完成 [发布检查](TESTING.md)。
+2. 运行 `npm test`，再按 Chrome 操作流程完成 [发布检查](TESTING.md)。
 3. 运行打包脚本，从 `dist` 取 ZIP。脚本只包含运行资源与面向使用者的说明，不包含测试、开发工具或 Git 数据。
 4. 再确认解压根目录有 `manifest.json`，用解压后的包加载扩展。
 5. 上传源码仓库前检查是否意外加入响应数据、HAR、Cookie 或密钥。
 
-自动化检查通过不等同于 Chrome 内端到端验证通过。
