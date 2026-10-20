@@ -8,8 +8,10 @@
     "node": ">=18"
   },
   "scripts": {
-    "test": "node tests/regression.cjs && node tests/package-check.cjs",
+    "test": "node tests/regression.cjs && node tests/package-check.cjs && npm run test:fixtures",
     "test:regression": "node tests/regression.cjs",
-    "test:package": "node tests/package-check.cjs"
+    "test:package": "node tests/package-check.cjs",
+    "test:manual": "node tests/manual/server.cjs",
+    "test:fixtures": "node --test tests/manual/check.cjs"
   }
 }

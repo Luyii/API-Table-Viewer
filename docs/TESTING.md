@@ -35,3 +35,8 @@ npm test
 现有 Node 单次检查：50,000 条、约 1.80 MiB 原文、150,001 个节点，解析约 241 ms，遍历约 174 ms，可见区请求 80 行。这只记录特定环境下的功能与规模检查，不能推导真实 Chrome 的性能或内存上限。
 
 本次具体修复、已知边界和验证限制见 [CHECK_REPORT.md](../CHECK_REPORT.md)。
+
+
+## 本地 Chrome 复现环境
+
+执行 `npm run test:manual`，打开 http://127.0.0.1:8765 ，在 API Table 面板打开后发送案例。无需安装依赖；完整数据说明、逐项验收和真实执行记录见 [Chrome 复现指南](CHROME_REPRO.md)。`npm run test:fixtures` 检查 HTTP 数据与真实 Worker 联动，不代表 Chrome 实机通过。

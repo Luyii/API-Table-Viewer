@@ -77,3 +77,8 @@ Windows 可用 `py scripts/package.py`。扩展安装本身不需要 Node.js 或
 扩展不上传捕获的数据，不加载远程代码，清单未申请额外权限。复制 cURL、请求详情和导出文件可能包含接口凭证及业务数据，分享前应自行检查内容。
 
 项目尚未指定开源许可证；创建 GitHub 仓库不代表授予开源使用许可。
+
+
+## 本地 Chrome 复现环境
+
+执行 `npm run test:manual`，打开 http://127.0.0.1:8765 ，在 API Table 面板打开后发送案例。无需安装依赖；完整数据说明、逐项验收和真实执行记录见 [Chrome 复现指南](docs/CHROME_REPRO.md)。`npm run test:fixtures` 检查 HTTP 数据与真实 Worker 联动，不代表 Chrome 实机通过。
