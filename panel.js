@@ -73,6 +73,7 @@ function resetDetail(){
   for(const id of ["pagination","tableMeta","tableBadge","rawPreview","rawMeta","tree"])$("#"+id).textContent="";
   $("#matchPosition").textContent="0 / 0";$("#prevMatch").disabled=true;$("#nextMatch").disabled=true;
   $("#requestDetails").textContent="";
+  $('#treeSearch').value='';
   $("#tablePath").textContent="未选择数组";$("#tableSearch").value="";closeModal();
 }
 function renderList() {
