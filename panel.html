@@ -13,6 +13,10 @@
     <button id="toggleSidebar" class="btn ghost" aria-controls="requestSidebar" aria-expanded="true" title="收起左侧接口列表">收起列表</button>
   </header>
 
+  <div id="responseMockBar" class="response-mock-bar hidden" role="status"><span id="responseMockSummary"></span><button id="responseMockRefresh" class="btn ghost">更新状态</button><button id="responseMockStopAll" class="btn ghost">停用全部替换</button></div>
+
+  <div id="fieldMockBar" class="field-mock-bar hidden"><div class="field-mock-heading"><span id="fieldMockSummary" role="status" aria-live="polite"></span><button id="fieldMockExit" class="btn">退出编辑</button></div><details><summary>查看修改</summary><div id="fieldMockChangeList"></div></details><span class="hint">网页重新请求时应用修改；真实后端仍会执行请求。</span></div>
+
   <div class="workspace">
     <aside id="requestSidebar" class="sidebar">
       <div class="side-title"><span>Network 接口</span><span id="requestCount" class="count">0</span><button id="closeSidebar" class="icon-btn" aria-label="收起接口列表" title="收起接口列表">×</button></div>
@@ -49,7 +53,8 @@
             <span id="statusBadge" class="status">200</span>
             <span id="urlText" class="url" title=""></span>
           </div>
-          <div class="head-actions">
+          <div class="head-actions"><span class="hint">双击字段值修改 · F2 编辑</span>
+            <button id="editResponseBtn" hidden class="btn edit-response-entry">编辑响应</button>
             <button id="copyCurlBtn" class="btn ghost" title="复制 Bash / WSL / Git Bash 格式的 cURL">复制 cURL</button>
             <button id="downloadResponseBtn" class="btn ghost">下载 JSON</button>
             <button id="copyUrlBtn" class="btn ghost">复制 URL</button>
@@ -139,6 +144,30 @@
   </div>
 </div>
 
+<div id="responseEditor" class="response-editor hidden" role="dialog" aria-modal="true" aria-labelledby="responseEditorTitle" aria-describedby="responseEditorNotice">
+  <div class="response-editor-card">
+    <header class="response-editor-head">
+      <div><div class="response-editor-eyebrow">RESPONSE WORKSPACE <span>本地草稿</span></div><h2 id="responseEditorTitle">编辑响应</h2></div>
+      <button id="responseEditorClose" class="icon-btn" aria-label="关闭响应编辑器">×</button>
+    </header>
+    <div class="response-editor-request"><span id="responseEditorMethod" class="method"></span><span id="responseEditorUrl"></span><span id="responseEditorSaveState" class="draft-state">未修改</span></div>
+    <div class="response-mock-controls">
+      <div class="response-mock-options"><button id="responseMockEnable" class="btn editor-primary">应用到网页</button><button id="responseMockDisable" class="btn ghost" disabled>恢复真实响应</button><span id="responseMockState" class="response-mock-state" role="status" aria-live="polite">应用后，回到网页重新查询即可看到修改</span></div>
+      <details class="response-mock-advanced"><summary>高级设置</summary><div class="response-mock-options"><label for="responseMockMode">生效方式</label><select id="responseMockMode"><option value="always" selected>持续替换</option><option value="once">仅下一次</option></select><label for="responseMockStatus">状态码</label><input id="responseMockStatus" type="number" min="200" max="599" step="1" value="200" aria-label="模拟响应 HTTP 状态码"><button id="responseMockReload" class="btn ghost">应用并刷新网页</button><button id="responseEditorCopy" class="btn ghost">复制草稿</button><button id="responseEditorSave" class="btn ghost">保存草稿</button></div><p>仅替换当前请求方法和完整 URL（含查询参数）。刷新会重新加载整个网页。</p></details>
+    </div>
+    <div class="response-editor-toolbar">
+      <div class="response-editor-tools"><button id="responseEditorFormat" class="btn">格式化 JSON</button><button id="responseEditorValidate" class="btn ghost" hidden>校验</button><button id="responseEditorRestore" class="btn ghost">恢复原始内容</button></div>
+      <span id="responseEditorValidity" class="editor-validity" role="status" aria-live="polite"></span>
+    </div>
+    <div class="response-editor-panes">
+      <section class="response-editor-pane original-pane" aria-labelledby="responseOriginalHeading"><div class="response-pane-heading"><span id="responseOriginalHeading">原始响应</span><span>只读</span></div><pre id="responseEditorOriginal" class="response-original" tabindex="0" aria-label="原始响应 JSON"></pre></section>
+      <section class="response-editor-pane" aria-labelledby="responseDraftHeading"><div class="response-pane-heading"><label id="responseDraftHeading" for="responseEditorInput">编辑后的响应</label><span id="responseEditorSize"></span></div><textarea id="responseEditorInput" class="response-editor-input" spellcheck="false" autocapitalize="off" autocomplete="off" aria-describedby="responseEditorError responseEditorNotice" aria-invalid="false" wrap="off"></textarea></section>
+    </div>
+    <div id="responseEditorError" class="response-editor-error hidden" role="alert"></div>
+    <details class="response-diff"><summary class="response-diff-heading"><span id="responseDiffHeading">字段变更</span><span id="responseEditorDiffSummary"></span><button id="responseEditorCompare" class="btn ghost" hidden>更新对比</button></summary><div id="responseEditorChanges" class="response-diff-list"></div></details>
+    <footer class="response-editor-footer"><p id="responseEditorNotice"><span class="editor-notice-dot"></span>启用后直接返回模拟数据，不请求真实后端。仅支持主页面异步 Fetch / XHR。</p></footer>
+  </div>
+</div>
 <div id="toast" class="toast"></div>
 <script src="json-codec.js"></script>
 <script src="panel.js"></script>
@@ -148,5 +177,10 @@
 <script src="developer.js"></script>
 <script src="layout.js"></script>
 <script src="shortcuts.js"></script>
+<script src="mock-page.js"></script>
+<script src="response-mock.js"></script>
+<script src="response-editor.js"></script>
+<script src="field-patch-core.js"></script>
+<script src="field-mock.js"></script>
 </body>
 </html>

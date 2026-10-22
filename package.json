@@ -1,6 +1,6 @@
 {
   "name": "api-table-viewer",
-  "version": "1.4.13",
+  "version": "1.5.0",
   "private": true,
   "description": "Chrome DevTools JSON response table and integrated JSON viewer",
   "license": "UNLICENSED",
@@ -8,10 +8,14 @@
     "node": ">=18"
   },
   "scripts": {
-    "test": "node tests/regression.cjs && node tests/package-check.cjs && npm run test:fixtures",
+    "preview": "node tests/preview/server.cjs",
+    "test": "node tests/regression.cjs && node tests/package-check.cjs && npm run test:fixtures && npm run test:mock && npm run test:preview && npm run test:fields",
     "test:regression": "node tests/regression.cjs",
     "test:package": "node tests/package-check.cjs",
     "test:manual": "node tests/manual/server.cjs",
-    "test:fixtures": "node --test tests/manual/check.cjs"
+    "test:fixtures": "node --test tests/manual/check.cjs",
+    "test:preview": "node --test tests/preview/check.cjs",
+    "test:mock": "node --test tests/response-mock.cjs",
+    "test:fields": "node --test tests/field-mock.cjs"
   }
 }

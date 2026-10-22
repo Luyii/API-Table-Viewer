@@ -1,4 +1,5 @@
 importScripts('json-codec.js');
+importScripts('field-patch-core.js');
 const records = new Map();
 let seq = 0, retainedBytes = 0;
 const MAX_BYTES = 20 * 1024 * 1024, CACHE_BYTES = 80 * 1024 * 1024, MAX_RECORDS = 150;
@@ -207,6 +208,8 @@ self.onmessage=e=>{
         result={text:text.slice(page*size,(page+1)*size),page,pages:Math.max(1,Math.ceil(text.length/size)),length:text.length};
       }
       else if(cmd==='valuePreview')result=valuePreview(getAt(rec.obj,e.data.path));
+      else if(cmd==='patchTarget')result=FieldPatchCore.target(rec.obj,e.data.path);
+      else if(cmd==='patchLocations')result={paths:e.data.patches.flatMap((patch,index)=>{try{return [{index,path:FieldPatchCore.resolve(rec.obj,patch)}];}catch{return [];}})};
       else if(cmd==='value')result={text:stringifyJson(getAt(rec.obj,e.data.path),null,2)};
       else if(cmd==='valueText'){const value=getAt(rec.obj,e.data.path);result={text:typeof value==='string'?value:stringifyJson(value,null,2)};}
       else if(cmd==='rawFull')result={text:rec.raw};

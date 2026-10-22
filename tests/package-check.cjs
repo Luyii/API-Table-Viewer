@@ -2,6 +2,10 @@ const fs=require('node:fs'),path=require('node:path'),vm=require('node:vm'),asse
 const root=path.join(__dirname,'..');
 const manifest=JSON.parse(fs.readFileSync(path.join(root,'manifest.json'),'utf8'));
 assert.equal(manifest.manifest_version,3);assert(fs.existsSync(path.join(root,manifest.devtools_page)));
+assert(manifest.permissions.includes('storage'));
+assert(fs.existsSync(path.join(root,manifest.background.service_worker)));
+for(const entry of manifest.content_scripts){assert.equal(entry.run_at,'document_start');for(const file of entry.js)assert(fs.existsSync(path.join(root,file)),file);}
+assert(manifest.content_scripts.some(entry=>entry.world==='MAIN' && entry.js.includes('field-mock-page.js')));
 const scripts=[];
 for(const file of ['devtools.html','panel.html']){
   const html=fs.readFileSync(path.join(root,file),'utf8');

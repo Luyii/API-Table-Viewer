@@ -55,6 +55,9 @@ vm.runInContext(fs.readFileSync(path.join(base,'table-ui.js'),'utf8'),ctx);
 vm.runInContext(fs.readFileSync(path.join(base,'viewer.js'),'utf8'),ctx);
 vm.runInContext(fs.readFileSync(path.join(base,'viewer-expanded.js'),'utf8'),ctx);
 vm.runInContext(fs.readFileSync(path.join(base,'developer.js'),'utf8'),ctx);
+ctx.TextEncoder=TextEncoder;
+get('#responseEditor').classList.add('hidden');
+vm.runInContext(fs.readFileSync(path.join(base,'response-editor.js'),'utf8'),ctx);
 const run=x=>vm.runInContext(x,ctx),req={request:{url:'https://test/api',method:'GET'},response:{status:200},time:1};ctx.fixture=req;
 await test('panel root table renders header and primitive values',async()=>{await run('addRequest(fixture,"[1,2,3]")');await run('selectRequest(requests[0])');assert(get('#tree').children[0].children[0].children.some(e=>e.textContent.includes('表格')));await run('openTable([])');assert.equal(get('#dataTable thead').children[0].children.length,2);assert.equal(get('#dataTable tbody').children.length,3);});
 await test('switch clears old table; stale results cannot overwrite',async()=>{delay=m=>m.cmd==='table'?30:0;const rendering=run('renderTable()');await run('addRequest(fixture,"{\\"new\\":true}")');await run('selectRequest(requests[0])');await rendering;assert.equal(get('#dataTable tbody').children.length,0);assert.equal(run('tableState.path'),null);delay=()=>0;});
@@ -158,5 +161,69 @@ await test('capture ignores HAR entries without content readers',()=>{ctx.unread
 await test('expanded viewport resizes and releases its observer on close',async()=>{let observer;ctx.ResizeObserver=class{constructor(fn){this.callback=fn;observer=this;}observe(el){this.target=el;}disconnect(){this.disconnected=true;}};ctx.raw=JSON.stringify(Array.from({length:6000},(_,i)=>i));await run('addRequest(fixture,raw)');await run('selectRequest(requests[0])');await run('showValue([],"JSON")');await run('expandWholeViewer([])');const before=run('viewerState.expansion.root.children.length');get('#modalContent').clientHeight=1200;await observer.callback();assert(run('viewerState.expansion.root.children.length')>before);run('closeModal()');assert(observer.disconnected);delete ctx.ResizeObserver;});
 await test('navigation respects the preserve-log setting',async()=>{const count=run('requests.length');await navigated();assert.equal(run('requests.length'),count);get('#preserveLog').checked=false;get('#preserveLog').onchange();await navigated();assert.equal(run('requests.length'),0);assert.equal(run('selected'),null);assert.equal(JSON.parse(preferences.get('api-table-viewer.dev.v1')).preserveLog,false);});
 await test('clear releases retained records and resets state',async()=>{await get('#clearBtn').onclick();assert.equal(run('requests.length'),0);assert.equal(run('selected'),null);assert.equal(run('pending.size'),0);});
+await test('response editor formats exact numeric tokens and escaped strings without rounding',()=>{
+  const raw='{"id":9007199254740993,"amount":128.50,"exponent":1e+03,"zero":-0,"text":"a \\\"quote\\\" and \\n line","empty":[]}';ctx.editorRaw=raw;
+  const text=run('ResponseEditor.format(editorRaw)');
+  assert(text.includes('9007199254740993'));assert(text.includes('128.50'));assert(text.includes('1e+03'));assert(text.includes('-0'));assert(text.includes('"empty": []'));
+  assert.deepEqual(JSON.parse(text),JSON.parse(raw));
+});
+await test('response editor validates scalars and rejects malformed or oversized JSON',()=>{
+  assert.equal(run('ResponseEditor.validate("null")'),null);assert.equal(run('ResponseEditor.validate("9007199254740993")'),9007199254740993n);
+  assert.throws(()=>run('ResponseEditor.validate("{bad}")'));
+  assert.throws(()=>run('ResponseEditor.validate(JSON.stringify("中".repeat(400000)))'),/1 MiB/);
+});
+await test('response editor diff identifies nested adds, removals and exact integer changes',()=>{
+  const result=run('ResponseEditor.diff(ResponseEditor.validate(\'{"items":[{"id":9007199254740993,"old":true}],"same":null}\'),ResponseEditor.validate(\'{"items":[{"id":9007199254740994,"new":false}],"same":null}\'))');
+  assert.equal(result.truncated,false);
+  assert.deepEqual(Array.from(result.changes,c=>({kind:c.kind,path:Array.from(c.path)})),[{kind:'changed',path:['items',0,'id']},{kind:'removed',path:['items',0,'old']},{kind:'added',path:['items',0,'new']}]);
+});
+await test('response editor treats prototype-named keys as data and ignores object key ordering',()=>{
+  const result=run('ResponseEditor.diff(ResponseEditor.validate(\'{"__proto__":{"safe":1},"constructor":2}\'),ResponseEditor.validate(\'{"constructor":2,"__proto__":{"safe":3}}\'))');
+  assert.equal(result.changes.length,1);assert.deepEqual(Array.from(result.changes[0].path),['__proto__','safe']);
+  assert.equal(run('ResponseEditor.diff({a:1,b:2},{b:2,a:1}).changes.length'),0);
+});
+await test('response editor bounds wide/deep diffs and caps displayed changes',()=>{
+  assert(run('ResponseEditor.diff({},Object.fromEntries(Array.from({length:20001},(_,i)=>[i,i]))).truncated'));
+  const result=run('ResponseEditor.diff(Array(200).fill(0),Array(200).fill(1))');assert.equal(result.changes.length,100);assert(result.truncated);
+  assert.throws(()=>run('ResponseEditor.format("[".repeat(65)+"0"+"]".repeat(65))'),/64/);
+});
+await test('response drafts do not mutate captured responses and copy preserves unsafe integers',async()=>{
+  ctx.editorRaw='{"id":9007199254740993,"name":"original","amount":128.50}';
+  await run('addRequest(fixture,editorRaw)');await run('selectRequest(requests[0]);');await run('ResponseEditor.open()');
+  assert(!get('#responseEditor').classList.contains('hidden'));assert(get('.app').inert);assert.equal(run('activeSearchScope()'),null);
+  get('#responseEditorInput').value='{"id":9007199254740994,"name":"edited"}';assert(run('ResponseEditor.save()'));
+  assert.equal(get('#responseEditorSaveState').textContent,'已保存草稿');
+  assert.equal((await run('callWorker("rawFull",{rid:selected.rid})')).text,ctx.editorRaw);
+  await get('#responseEditorCopy').onclick();assert.equal(copied,'{"id":9007199254740994,"name":"edited"}');
+  run('ResponseEditor.reset(true)');assert(!get('.app').inert);assert(get('#editResponseBtn').focused);
+  await run('ResponseEditor.open()');assert.equal(get('#responseEditorInput').value,copied);
+});
+await test('invalid editor drafts cannot be saved or copied and never show stale diffs',async()=>{
+  const previous=copied;get('#responseEditorInput').value='{"id":';get('#responseEditorInput').oninput();
+  assert(get('#responseEditorSave').disabled);assert.equal(get('#responseEditorChanges').textContent,'');
+  assert.equal(run('ResponseEditor.save()'),false);assert.equal(get('#responseEditorInput')['aria-invalid'],'true');
+  assert(get('#responseEditorError').textContent.includes('JSON 无效'));
+  await get('#responseEditorCopy').onclick();assert.equal(copied,previous);
+  run('ResponseEditor.reset()');await run('ResponseEditor.open()');assert.equal(get('#responseEditorInput').value,'{"id":');
+  get('#responseEditorRestore').onclick();assert(!get('#responseEditorSave').disabled);assert.equal(get('#responseEditorDiffSummary').textContent,'网页使用假数据后自动对比');
+});
+await test('response editor isolates drafts when switching captured requests',async()=>{
+  ctx.firstEditorItem=run('selected');get('#responseEditorInput').value='{"first":"draft"}';run('ResponseEditor.save()');
+  await run('addRequest(fixture,\'{"second":true}\')');await run('selectRequest(requests[0])');
+  assert(get('#responseEditor').classList.contains('hidden'));assert(!get('.app').inert);
+  await run('ResponseEditor.open()');assert(get('#responseEditorInput').value.includes('"second": true'));assert(!get('#responseEditorInput').value.includes('first'));
+  await run('selectRequest(firstEditorItem)');await run('ResponseEditor.open()');assert.equal(get('#responseEditorInput').value,'{"first":"draft"}');
+});
+await test('response editor ignores stale response loads after a request switch',async()=>{
+  run('ResponseEditor.reset()');delay=m=>m.cmd==='rawFull'?30:0;
+  const opening=run('ResponseEditor.open()');await run('selectRequest(requests[0])');await opening;delay=()=>0;
+  assert(get('#responseEditor').classList.contains('hidden'));assert(!get('.app').inert);
+});
+await test('response editor rejects large original responses and clear closes the editor',async()=>{
+  await run('addRequest(fixture,JSON.stringify("x".repeat(1024*1024)))');await run('selectRequest(requests[0])');
+  await assert.rejects(()=>run('ResponseEditor.open()'),/1 MiB/);assert(get('#responseEditor').classList.contains('hidden'));
+  await run('selectRequest(firstEditorItem)');await run('ResponseEditor.open()');await get('#clearBtn').onclick();
+  assert(get('#responseEditor').classList.contains('hidden'));assert(!get('.app').inert);assert.equal(run('selected'),null);
+});
 console.log(`${passed} regression tests passed`);
 })().catch(e=>{console.error(e);process.exitCode=1;});
