@@ -16,6 +16,28 @@ npm test
 
 回归测试在 Node.js 中运行 Worker 代码，通过模拟 DOM 和 DevTools 对象检查界面逻辑。接口测试使用随机端口，结束后自动关闭服务。2026-10-20 的自动检查结果：78 项回归、静态检查、8 个接口子案例通过。
 
+## GitHub Actions CI
+
+`.github/workflows/ci.yml` 在所有分支的 `push`、`pull_request`（创建、重新打开和更新提交）以及手动触发时运行，不设置路径过滤。
+
+- Node.js 18、22、24 分别执行 `npm test`，覆盖上述三类自动检查；18 用于验证当前声明的最低版本兼容性。
+- 所有测试任务成功后，使用 Node.js 24 和 Python 3.12 执行 `python3 scripts/package.py`，再执行 `python3 tests/package-archive.py`。
+- ZIP 检查核对打包白名单、重复条目、完整性及文件内容，并对临时解压目录运行现有资源、CSP 和语法检查。版本号从清单读取，无需在 CI 中同步修改。
+- 不安装 npm 或 Python 项目依赖，不使用依赖缓存，不发布产物。工作流仅申请仓库读取权限。
+- 任一命令失败会使对应任务失败；不同 Node.js 版本继续独立检查。每项任务限时 10 分钟，同一事件和 ref 的新运行会取消旧运行。
+
+本地复现打包检查：
+
+```sh
+npm test
+python3 scripts/package.py
+python3 tests/package-archive.py
+```
+
+实际 CI 结果以仓库 Actions 页面为准。自动检查和 ZIP 验证不代表已完成 Chrome 浏览器验收。
+
+2026-10-22 本地验证（Node.js 24.19.0、Python 3.12.14）：`npm test` 的 78 项回归、资源检查和 8 个接口子案例通过（Node 测试报告另计 1 个父案例）；打包及 ZIP 解压资源验证通过。移除 ZIP 中的 `worker.js` 后，验证命令按预期返回非零退出码。工作流通过 actionlint 1.7.12 静态检查。该记录不代表其他 Node.js 版本或 GitHub 托管运行器上的检查已通过。
+
 ## 浏览器验收
 
 ```sh
