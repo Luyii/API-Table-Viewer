@@ -56,9 +56,14 @@ function stringifyJson(value,replacer=null,space){
         if(row && typeof row==='object' && !Array.isArray(row)){
           const keys=Object.keys(row).filter(k=>/^(id|uuid|key)$/i.test(k) || /id$/i.test(k));
           const identity=keys.find(k=>scalar(row[k]) && row[k]!==null && value.filter(r=>r && Object.hasOwn(r,k) && token(r[k])===token(row[k])).length===1);
-          if(!identity)throw Error('数组行缺少唯一 id / uuid / key，无法安全定位修改');
-          if(depth===path.length-2 && path.at(-1)===identity)throw Error('暂不支持修改用于定位数组行的标识字段');
-          anchors.push({depth,key:identity,value:token(row[identity])});
+          if(!identity){
+            const snapshot=token(row);
+            if(snapshot.length>65536)throw Error('无唯一标识的数组行超过 64 KiB，无法安全编辑');
+            if(value.filter(r=>token(r)===snapshot).length!==1)throw Error('数组中存在内容相同的行，无法安全定位修改');
+            anchors.push({depth,key:null,value:snapshot,snapshot:true});
+          }
+          if(identity && depth===path.length-2 && path.at(-1)===identity)throw Error('暂不支持修改用于定位数组行的标识字段');
+          if(identity)anchors.push({depth,key:identity,value:token(row[identity])});
         }else if(scalar(row))anchors.push({depth,key:null,value:token(row)});
         else throw Error('嵌套数组缺少稳定标识，暂不支持编辑');
       }
@@ -72,7 +77,7 @@ function stringifyJson(value,replacer=null,space){
     if(!patch || !Array.isArray(patch.path) || patch.path.length>64 || !patch.path.every(k=>typeof k==='string' || Number.isInteger(k)&&k>=0))throw Error('字段路径无效');
     if(!Array.isArray(patch.anchors) || patch.anchors.length>64)throw Error('数组定位无效');
     for(const a of patch.anchors){
-      if(!Number.isInteger(a.depth) || a.depth<0 || a.depth>=patch.path.length || a.key!==null && typeof a.key!=='string' || typeof a.value!=='string' || a.value.length>65536 || !scalar(parseJsonExact(a.value)))throw Error('数组标识无效');
+      if(!Number.isInteger(a.depth) || a.depth<0 || a.depth>=patch.path.length || a.key!==null && typeof a.key!=='string' || typeof a.value!=='string' || a.value.length>65536 || !(a.snapshot===true?a.key===null && parseJsonExact(a.value)!==null && typeof parseJsonExact(a.value)==='object' && !Array.isArray(parseJsonExact(a.value)):scalar(parseJsonExact(a.value))))throw Error('数组标识无效');
     }
     if(typeof patch.value!=='string' || patch.value.length>65536 || typeof patch.old!=='string' || patch.old.length>65536)throw Error('字段内容过大');
     const value=parseJsonExact(patch.value),old=parseJsonExact(patch.old);
@@ -85,7 +90,16 @@ function stringifyJson(value,replacer=null,space){
       let key=patch.path[depth];const anchor=patch.anchors.find(a=>a.depth===depth);
       if(Array.isArray(value)){
         if(!anchor || value.length>100000)throw Error('数组缺少定位信息');
-        if(anchor.key===null){if(token(value[key])!==anchor.value && token(value[key])!==patch.value)throw Error('数组元素已改变');}
+        if(anchor.snapshot===true){
+          const original=parseJsonExact(anchor.value),updated=parseJsonExact(anchor.value);
+          let parent=updated;
+          for(const part of patch.path.slice(depth+1,-1)){if(parent===null || typeof parent!=='object' || !Object.hasOwn(parent,part))throw Error('数组行内容已改变');parent=parent[part];}
+          Object.defineProperty(parent,patch.path.at(-1),{value:parseJsonExact(patch.value),writable:true,enumerable:true,configurable:true});
+          const before=token(original),after=token(updated),indices=[];
+          for(let i=0;i<value.length;i++){const text=token(value[i]);if(text===before || text===after)indices.push(i);}
+          if(indices.length!==1)throw Error('无标识数组行已改变或重复，已跳过修改');
+          key=indices[0];
+        }else if(anchor.key===null){if(token(value[key])!==anchor.value && token(value[key])!==patch.value)throw Error('数组元素已改变');}
         else{
           const indices=[];
           for(let i=0;i<value.length;i++)if(value[i] && Object.hasOwn(value[i],anchor.key) && token(value[i][anchor.key])===anchor.value)indices.push(i);
@@ -101,9 +115,11 @@ function stringifyJson(value,replacer=null,space){
   }
   function apply(root,patches){
     const warnings=[];let applied=0;
-    for(const patch of patches){
+    const targets=patches.map(patch=>{try{validate(patch);return {patch,path:resolve(root,patch)};}catch(error){warnings.push(error.message);return null;}});
+    for(const target of targets){
+      if(!target)continue;const {patch,path}=target;
       try{
-        validate(patch);const path=resolve(root,patch),next=parseJsonExact(patch.value);
+        const next=parseJsonExact(patch.value);
         if(!path.length)root=next;
         else{let parent=root;for(const key of path.slice(0,-1))parent=parent[key];Object.defineProperty(parent,path.at(-1),{value:next,writable:true,enumerable:true,configurable:true});}
         applied++;
@@ -111,6 +127,6 @@ function stringifyJson(value,replacer=null,space){
     }
     return {value:root,applied,warnings};
   }
-  function identity(patch){return JSON.stringify([patch.path.map((k,i)=>patch.anchors.some(a=>a.depth===i && a.key!==null)?'*':k),patch.anchors]);}
+  function identity(patch){return JSON.stringify([patch.path.map((k,i)=>patch.anchors.some(a=>a.depth===i && (a.key!==null || a.snapshot===true))?'*':k),patch.anchors]);}
   return {parse:parseJsonExact,stringify:stringifyJson,target,validate,resolve,apply,identity};
 })();

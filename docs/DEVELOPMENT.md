@@ -44,7 +44,7 @@ python3 scripts/package.py
 
 1.5.0 的默认调试路径是原位标量编辑。`field-mock.js` 将表格、数据树与查看器中的值绑定到 Worker 路径；提交时只请求 `patchTarget`，取得原值、类型、字段路径和数组行标识。修改以补丁保存，不调用整份响应编辑器，也不运行整份 JSON diff。Worker 中的捕获记录保持原样。
 
-`field-patch-core.js` 在 Worker、面板、后台与 MAIN world 复用路径、类型验证和精确整数逻辑。数组对象通过唯一 ID / UUID / key 定位；后端排序改变时重新找行，标识缺失 / 重复或字段类型改变时跳过。单字段 64 KiB，响应载入仍为 20 MiB；规则配置最多 30 个接口、每接口 200 个字段、合计 1 MiB。
+`field-patch-core.js` 在 Worker、面板、后台与 MAIN world 复用路径、类型验证和精确整数逻辑。数组对象优先通过唯一 ID / UUID / key 定位；缺少唯一标识时使用不超过 64 KiB 的完整行内容匹配，内容变化或重复时跳过。多字段补丁先在原响应上完成定位，再统一应用；后端排序改变时重新找行，标识缺失 / 重复或字段类型改变时跳过。单字段 64 KiB，响应载入仍为 20 MiB；规则配置最多 30 个接口、每接口 200 个字段、合计 1 MiB。
 
 `field-mock-background.js` 将规则写入 `chrome.storage.session`，按标签页 ID 和页面 origin 分组，串行处理同一标签页的读写。隔离世界的 `field-mock-bridge.js` 仅向当前 origin 传递配置，网页不能经由桥接写入扩展存储。关闭标签页时删除对应会话，重启浏览器或重新加载扩展也会清除。
 

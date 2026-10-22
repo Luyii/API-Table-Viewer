@@ -16,7 +16,7 @@ test('stable row identifiers follow sorting, while missing/duplicate IDs and cha
   const result=core.apply(next,[change]);assert.equal(result.value.rows[0].amount,25);assert.equal(result.value.rows[1].amount,99);
   for(const raw of ['{"rows":[]}','{"rows":[{"orderId":1,"amount":12},{"orderId":1,"amount":13}]}','{"rows":[{"orderId":1,"amount":"13"}]}'])assert.equal(core.apply(core.parse(raw),[change]).applied,0);
   assert.throws(()=>core.target(original,['rows',0,'orderId']),/标识字段/);
-  assert.throws(()=>core.target({rows:[{value:1}]},['rows',0,'value']),/唯一/);
+  assert.equal(core.target({rows:[{value:1}]},['rows',0,'value']).anchors[0].snapshot,true);
 });
 test('a response over 1 MiB can produce a tiny field patch without a full response draft',()=>{
   const data={padding:'x'.repeat(2*1024*1024),amount:1};const change=patch(data,['amount'],'2');
@@ -111,4 +111,50 @@ test('shared field codec retains the same exact-integer implementation as the or
 
 test('duplicate startup configuration does not invalidate an in-flight patched Fetch',async()=>{
   const p=page(sample());const pending=p.context.fetch('https://example.test/api');p.configure(sample());assert.equal((await (await pending).json()).data.name,'mock');
+});
+
+
+test('nested arrays without IDs follow unique row contents and skip changed or duplicate rows',()=>{
+  const original={rows:[{id:1,items:[{name:'a',amount:1},{name:'b',amount:2}]}]};
+  const a=patch(original,['rows',0,'items',0,'amount'],'9');
+  const b=patch(original,['rows',0,'items',0,'name'],'"edited"');
+  const next={rows:[{id:1,items:[{name:'b',amount:2},{name:'a',amount:1}]}]};
+  const result=core.apply(next,[a,b]);assert.equal(result.applied,2);assert.equal(next.rows[0].items[1].amount,9);assert.equal(next.rows[0].items[1].name,'edited');
+  assert.equal(core.apply({rows:[{id:1,items:[{name:'a',amount:3}]}]},[a]).applied,0);
+  assert.equal(core.apply({rows:[{id:1,items:[{name:'a',amount:1},{name:'a',amount:1}]}]},[a]).applied,0);
+  assert.throws(()=>core.target({rows:[{value:1},{value:1}]},['rows',0,'value']),/相同/);
+  assert.throws(()=>core.target({rows:[{value:'x'.repeat(65536)}]},['rows',0,'value']),/64 KiB/);
+});
+
+test('hovering a whole field row supports F2 without clicking or focusing the value',async()=>{
+  const handlers={},nodes=new Map(),calls=[],messages=[],notifications=[];
+  function element(tag='DIV'){
+    const listeners={},classes=new Set();return {tagName:tag,isConnected:true,dataset:{},textContent:'1',innerHTML:'1',title:'',classList:{add:x=>classes.add(x),remove:x=>classes.delete(x),contains:x=>classes.has(x),toggle(){}},
+      addEventListener:(type,fn)=>{listeners[type]=fn;},listeners,setAttribute(){},removeAttribute(){},appendChild(child){this.child=child;},focus(){listeners.focus?.();},select(){}};
+  }
+  const context=vm.createContext({URL,structuredClone,setTimeout,clearTimeout,console,FieldPatchCore:core,selected:null,pathText:p=>p.join('.'),toast:message=>notifications.push(message),safe:fn=>(...args)=>Promise.resolve(fn(...args)),
+    document:{addEventListener:(type,fn)=>{handlers[type]=fn;},querySelector:()=>null,querySelectorAll:()=>[],createElement:tag=>element(tag.toUpperCase())},
+    $:id=>{if(!nodes.has(id))nodes.set(id,element());return nodes.get(id);},
+    chrome:{runtime:{sendMessage:async message=>{messages.push(message);return {ok:true,origin:'https://example.test',rules:[]};}},devtools:{inspectedWindow:{tabId:1},network:{onNavigated:{addListener(){}}}}},
+    callWorker:async(cmd,data)=>{calls.push({cmd,data});return core.target({amount:1},data.path);}});
+  vm.runInContext(source('field-mock.js'),context);await new Promise(resolve=>setImmediate(resolve));
+  const field=element('SPAN'),cell=element('TD'),item={rid:'one',method:'GET',url:'https://example.test/api'};
+  context.field=field;context.cell=cell;context.item=item;vm.runInContext("FieldMock.bind(field,item,['amount'],'number',cell)",context);
+  assert.equal(cell.tabIndex,0);
+  const other=element('SPAN');context.other=other;vm.runInContext("FieldMock.bind(other,item,['amount'],'number')",context);other.listeners.focus();
+  cell.listeners.pointerenter();
+  await handlers.keydown({key:'F2',target:cell,preventDefault(){},stopPropagation(){},defaultPrevented:false});
+  assert.equal(calls[0].cmd,'patchTarget');assert.equal(field.child.tagName,'INPUT');
+  assert.equal(field.child.value,'1');assert.equal(other.child,undefined);
+  cell.listeners.pointerleave();
+  const count=calls.length;await handlers.keydown({key:'F2',target:{tagName:'INPUT'}});assert.equal(calls.length,count);
+  field.child.onblur();await new Promise(resolve=>setImmediate(resolve));
+  assert.equal(messages.filter(m=>m.action==='set').length,0);assert.equal(notifications.length,0);
+  await vm.runInContext('FieldMock.edit(field)',context);
+  field.child.value='1.0';field.child.onkeydown({key:'Enter',preventDefault(){},stopPropagation(){}});
+  await new Promise(resolve=>setImmediate(resolve));
+  assert.equal(messages.filter(m=>m.action==='set').length,0);assert.equal(notifications.length,0);
+  await vm.runInContext('FieldMock.edit(field)',context);
+  field.child.value='2';field.child.onblur();await new Promise(resolve=>setImmediate(resolve));
+  assert.equal(messages.filter(m=>m.action==='set').length,1);assert(notifications.some(text=>text.includes('已保存修改')));
 });

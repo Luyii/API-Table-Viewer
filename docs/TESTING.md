@@ -10,11 +10,11 @@ npm test
 
 | 命令 | 检查内容 |
 | --- | --- |
-| `npm run test:regression` | 88 项回归：解析、整数精度、路径、排序、搜索定位、导出、缓存、异步状态、列宽、详情复制和响应编辑 |
+| `npm run test:regression` | 89 项回归：解析、整数精度、路径、排序、搜索定位、导出、缓存、异步状态、列宽、详情复制和响应编辑 |
 | `npm run test:package` | MV3 清单、入口资源、HTML ID、CSP、脚本语法及面板共享作用域 |
 | `npm run test:fixtures` | 本地 HTTP 接口与 Worker 联动，包括节点阈值、50,000 条记录、精确整数和长文本 |
 | `npm run test:preview` | 示例 HAR、预览 HTTP 路由，以及生成预览的脚本语法和 HTML 标识 |
-| `npm run test:fields` | 13 项原位字段 Mock 检查：精确整数、类型、数组定位、大响应小补丁、Fetch / XHR、启动请求、会话恢复、站点隔离与 Worker 路径 |
+| `npm run test:fields` | 15 项原位字段 Mock 检查：精确整数、类型、数组定位、大响应小补丁、Fetch / XHR、启动请求、会话恢复、站点隔离与 Worker 路径 |
 | `npm run test:mock` | 18 项：Fetch / XHR 拦截、精确匹配、单次并发、取消、类型、规则更新、租约、面板控制和 HTTP 页面联动 |
 
 回归测试在 Node.js 中运行 Worker 代码，通过模拟 DOM 和 DevTools 对象检查界面逻辑。接口测试使用随机端口，结束后自动关闭服务。2026-10-20 的自动检查结果：78 项回归、静态检查、8 个接口子案例通过。

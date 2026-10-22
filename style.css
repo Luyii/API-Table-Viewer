@@ -181,7 +181,9 @@ select{background:#242426;color:#ddd;border:1px solid #444;border-radius:4px;pad
 }
 
 /* Search placement follows the data it controls. */
-.topbar #toggleSidebar{margin-left:auto}
+.topbar{justify-content:flex-start;gap:8px}
+.topbar #toggleSidebar{order:-1;margin-left:0}
+.field-mock-selected{outline:1px solid var(--blue,#60a5fa);outline-offset:2px}
 .request-search{flex:none;padding:9px 8px 8px;background:var(--panel);border-bottom:1px solid var(--line)}
 .request-search>label{display:block;margin-bottom:5px;color:#b9cce3;font-weight:500}
 .request-search-controls{display:flex;align-items:center;gap:5px;flex-wrap:wrap}

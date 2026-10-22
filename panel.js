@@ -124,7 +124,7 @@ function renderNode(meta,parent,root=false,path=[]) {
   head.innerHTML=`<span class="caret ${expandable?"":"leaf"}">${expandable?"▶":""}</span><span class="node-key">${root?"root":esc(path[path.length-1])}</span><span class="node-type ${typeClass(meta.type)}">${esc(expandable?meta.label:meta.type)}</span>${!expandable?`<span class="node-preview">${esc(meta.label)}</span>`:""}`;
   if(meta.type==="array") {const b=document.createElement("button");b.className="mini-btn";b.textContent="▦ 表格";b.onclick=safe(e=>{e.stopPropagation();return openTable(path);});head.appendChild(b);}
   if(root){const b=document.createElement("button");b.className="mini-btn";b.textContent="查看";b.onclick=safe(e=>{e.stopPropagation();return showValue(path,"root");});head.appendChild(b);}
-  if(!expandable && typeof FieldMock!=='undefined')FieldMock.bind(head.querySelector('.node-preview'),selected,path,meta.type);
+  if(!expandable && typeof FieldMock!=='undefined')FieldMock.bind(head.querySelector('.node-preview'),selected,path,meta.type,head);
   wrap.appendChild(head); parent.appendChild(wrap);
   const children=document.createElement("div"); children.className="node-children hidden"; wrap.appendChild(children);
   if(expandable){
@@ -163,7 +163,7 @@ function renderChildren(list,parent){
     } else {
       const b=document.createElement("button"); b.className="copy-mini"; b.textContent="复制值"; b.onclick=safe(e=>{e.stopPropagation();return callWorker("value",{rid:selected.rid,path:basePath}).then(r=>copyText(c.type==="string"?JSON.parse(r.text):r.text));}); head.appendChild(b);
     }
-    if(!expandable && typeof FieldMock!=='undefined')FieldMock.bind(head.querySelector('.node-preview'),selected,basePath,c.type);
+    if(!expandable && typeof FieldMock!=='undefined')FieldMock.bind(head.querySelector('.node-preview'),selected,basePath,c.type,head);
     wrap.appendChild(head);
     const child=document.createElement("div"); child.className="node-children hidden"; wrap.appendChild(child);
     parent.appendChild(wrap);
@@ -367,9 +367,8 @@ const seen=new WeakSet(), recent=new Map();
 const requestKey=r=>r.startedDateTime?stringifyJson([r.startedDateTime,r.request?.url,r.request?.method,r.time,r.response?.status]):null;
 function capture(req){
   if(!req?.request?.url || typeof req.getContent!=="function")return;
-  if(seen.has(req))return;seen.add(req);
+  if(seen.has(req))return;
   const key=requestKey(req);if(key && recent.has(key))return;
-  if(key){recent.set(key,true);if(recent.size>500)recent.delete(recent.keys().next().value);}
   const generation=captureGeneration;
   const ct=(req.response?.headers||[]).find(h=>h.name.toLowerCase()==="content-type")?.value?.toLowerCase()||req.response?.content?.mimeType?.toLowerCase()||"";
   if(/^(image|audio|video|font)\//.test(ct))return;
@@ -379,16 +378,27 @@ function capture(req){
     try {
       if(encoding==="base64") {const binary=atob(body);body=new TextDecoder().decode(Uint8Array.from(binary,c=>c.charCodeAt(0)));}
       if(body.length>20*1024*1024)return;
-      if(ct.includes("json") || /^[\s]*[\[{]/.test(body))void safe(addRequest)(req,body,generation);
+      if(ct.includes("json") || /^[\s]*[\[{]/.test(body)){
+        // HAR can expose an entry before its body is readable. Deduplicate only
+        // after a usable body arrives so onRequestFinished can retry that entry.
+        if(seen.has(req) || key && recent.has(key))return;
+        seen.add(req);
+        if(key){recent.set(key,true);if(recent.size>500)recent.delete(recent.keys().next().value);}
+        void safe(addRequest)(req,body,generation);
+      }
     } catch(e){toast("响应解码失败："+e.message);}
   });
 }
+let networkCaptureStarted=false;
 function startNetworkCapture(){
+  if(networkCaptureStarted)return;
+  networkCaptureStarted=true;
   chrome.devtools.network.onRequestFinished.addListener(capture);
   const bootstrapGeneration=captureGeneration;
   chrome.devtools.network.getHAR(har=>{if(chrome.runtime.lastError || bootstrapGeneration!==captureGeneration)return;for(const req of har.entries||[])capture(req);});
 }
 // Initialize capture after the companion scripts and saved preferences are ready.
-document.addEventListener("DOMContentLoaded",startNetworkCapture,{once:true});
+if(document.readyState==='loading')document.addEventListener("DOMContentLoaded",startNetworkCapture,{once:true});
+else setTimeout(startNetworkCapture,0);
 // All UI promises report errors instead of producing unhandled rejections.
 for(const el of document.querySelectorAll("button"))if(el.onclick)el.onclick=safe(el.onclick);

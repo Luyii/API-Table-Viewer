@@ -157,6 +157,19 @@ await test('paged content copy includes every page and keeps exact scalar number
 });
 await test('scalar paging rejects stale page responses',async()=>{ctx.raw=JSON.stringify('A'.repeat(10000)+'B'.repeat(10000)+'C'.repeat(10000));await run('addRequest(fixture,raw)');await run('selectRequest(requests[0])');await run('showValue([],"JSON")');delay=m=>m.cmd==='valuePage'&&m.page===0?30:0;const old=run('viewerScalar([],0,viewerState,viewerState.version)');await run('viewerScalar([],1,viewerState,viewerState.version)');await old;assert(get('#modalContent').children.find(e=>e.className==='viewer-scalar').textContent.startsWith('B'));delay=()=>0;});
 await test('manual root collapse updates the global expansion toggle',async()=>{ctx.raw='{"a":{"b":1}}';await run('addRequest(fixture,raw)');await run('selectRequest(requests[0])');await run('showValue([],"JSON")');const root=get('#modalContent').children[0].children[0].children[0];await root.onclick();assert.equal(get('#viewerCollapse').textContent,'展开全部');await root.onclick();assert.equal(get('#viewerCollapse').textContent,'收起全部');});
+await test('an empty HAR body does not suppress the finished request with the same identity',async()=>{
+  ctx.captureRetry={startedDateTime:'2026-10-22T12:00:00Z',request:{url:'https://test/retry',method:'GET'},response:{status:200,headers:[{name:'content-type',value:'application/json'}]},time:1,getContent:done=>done('', '')};
+  run('capture(captureRetry)');
+  ctx.captureRetry.getContent=done=>done('{"retry":true}', '');
+  run('capture(captureRetry)');await new Promise(resolve=>setTimeout(resolve,20));
+  assert.equal(run('requests.filter(r=>r.url==="https://test/retry").length'),1);
+  run('capture(captureRetry)');await new Promise(resolve=>setTimeout(resolve,20));
+  assert.equal(run('requests.filter(r=>r.url==="https://test/retry").length'),1);
+  ctx.harRetry={...ctx.captureRetry,startedDateTime:'2026-10-22T12:01:00Z',request:{url:'https://test/retry-distinct',method:'GET'},getContent:done=>done('', '')};
+  run('capture(harRetry)');ctx.finishedRetry={...ctx.harRetry,getContent:done=>done('{"retry":2}', '')};
+  run('capture(finishedRetry)');await new Promise(resolve=>setTimeout(resolve,20));
+  assert.equal(run('requests.filter(r=>r.url==="https://test/retry-distinct").length'),1);
+});
 await test('capture ignores HAR entries without content readers',()=>{ctx.unreadable={request:{url:'https://test/missing'},response:{}};assert.doesNotThrow(()=>run('capture(unreadable)'));});
 await test('expanded viewport resizes and releases its observer on close',async()=>{let observer;ctx.ResizeObserver=class{constructor(fn){this.callback=fn;observer=this;}observe(el){this.target=el;}disconnect(){this.disconnected=true;}};ctx.raw=JSON.stringify(Array.from({length:6000},(_,i)=>i));await run('addRequest(fixture,raw)');await run('selectRequest(requests[0])');await run('showValue([],"JSON")');await run('expandWholeViewer([])');const before=run('viewerState.expansion.root.children.length');get('#modalContent').clientHeight=1200;await observer.callback();assert(run('viewerState.expansion.root.children.length')>before);run('closeModal()');assert(observer.disconnected);delete ctx.ResizeObserver;});
 await test('navigation respects the preserve-log setting',async()=>{const count=run('requests.length');await navigated();assert.equal(run('requests.length'),count);get('#preserveLog').checked=false;get('#preserveLog').onchange();await navigated();assert.equal(run('requests.length'),0);assert.equal(run('selected'),null);assert.equal(JSON.parse(preferences.get('api-table-viewer.dev.v1')).preserveLog,false);});

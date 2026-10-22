@@ -2,6 +2,19 @@
 const FieldMock=(()=>{
   let rules=[],origin='',version=0,loading=0,queue=Promise.resolve();
   const bindings=new WeakMap(),locations=new Map();
+  let activeField=null,hoveredField=null;
+  function selectField(el){
+    activeField?.classList.remove('field-mock-selected');activeField=el;
+    el.classList.add('field-mock-selected');
+  }
+  document.addEventListener('keydown',safe(async e=>{
+    if(e.key!=='F2' || e.defaultPrevented || /^(INPUT|TEXTAREA|SELECT)$/.test(e.target?.tagName) || e.target?.isContentEditable)return;
+    const field=hoveredField?.isConnected?hoveredField:activeField;
+    if(!field?.isConnected)return;
+    const modal=document.querySelector('#modal');
+    if(modal && !modal.classList.contains('hidden') && !modal.contains(field))return;
+    e.preventDefault();e.stopPropagation();selectField(field);await edit(field);
+  }),true);
   const keyFor=item=>String(item.method).toUpperCase()+' '+normalize(item.url);
   function normalize(url){const parsed=new URL(url);parsed.hash='';return parsed.href;}
   const ruleFor=item=>rules.find(r=>r.method+' '+r.url===keyFor(item));
@@ -56,6 +69,16 @@ const FieldMock=(()=>{
     if(click)el.onclick=e=>{e.stopPropagation();clearTimeout(timer);timer=setTimeout(()=>{if(!binding.editing && selected===binding.item)void click(e);},260);};
     const start=safe(async e=>{e.preventDefault();e.stopPropagation();clearTimeout(timer);await edit(el);});
     el.ondblclick=start;
+    mark.addEventListener('pointerenter',()=>{hoveredField=el;});
+    mark.addEventListener('pointerleave',()=>{if(hoveredField===el)hoveredField=null;});
+    el.addEventListener('pointerdown',()=>selectField(el));
+    el.addEventListener('focus',()=>selectField(el));
+    if(mark!==el){
+      mark.tabIndex=0;
+      mark.addEventListener('pointerdown',e=>{if(e.target===mark || e.target===el.parentElement){selectField(el);mark.focus();}});
+      mark.addEventListener('focus',()=>selectField(el));
+      mark.addEventListener('keydown',e=>{if(e.key==='F2'){void start(e);}});
+    }
     const keydown=el.onkeydown;el.onkeydown=e=>{if(e.key==='F2'){void start(e);return;}keydown?.(e);};
     void paint(el);
   }
@@ -82,6 +105,7 @@ const FieldMock=(()=>{
         value=patch.type==='string'?JSON.stringify(input.value):FieldPatchCore.stringify(FieldPatchCore.parse(input.value));
         FieldPatchCore.validate({...patch,value});
       }catch(error){input.setAttribute('aria-invalid','true');input.title=error.message+' · Esc 取消';toast(error.message);input.focus();return;}
+      if(value===FieldPatchCore.stringify(current)){cancel();return;}
       saving=true;input.disabled=true;
       try{
         if(origin!==currentOrigin)throw Error('网页已切换，修改未保存');

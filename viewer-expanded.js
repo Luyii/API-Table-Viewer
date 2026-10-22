@@ -46,7 +46,7 @@ async function renderExpandedViewport(s,e){
     const arrow=document.createElement('span');arrow.className='flat-caret';arrow.textContent=meta.type==='object'||meta.type==='array'?'▾':'·';row.appendChild(arrow);
     const key=document.createElement('span');key.className='viewer-key';highlightText(key,meta.path.length?String(meta.path.at(-1)):'root',s.query);key.title=pathText(meta.path);row.appendChild(key);
     const value=document.createElement('span');value.className='viewer-value type-'+meta.type;highlightText(value,meta.label,s.query);value.title=meta.label;row.appendChild(value);
-    if(typeof FieldMock!=='undefined')FieldMock.bind(value,selected?.rid===s.rid?selected:null,meta.path,meta.type);
+    if(typeof FieldMock!=='undefined')FieldMock.bind(value,selected?.rid===s.rid?selected:null,meta.path,meta.type,row);
     row.appendChild(viewerButton('进入',()=>navigateViewer(meta.path)));
     row.appendChild(viewerButton('路径',()=>copyText(pathText(meta.path))));
     row.appendChild(viewerButton('复制',async()=>{const r=await callWorker('value',{rid:s.rid,path:meta.path});return copyText(r.text);}));e.root.appendChild(row);
