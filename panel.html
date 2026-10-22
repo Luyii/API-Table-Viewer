@@ -5,12 +5,36 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>API Table Viewer</title>
 <link rel="stylesheet" href="style.css">
+<script src="appearance.js"></script>
 </head>
 <body>
 <div class="app">
   <header class="topbar">
     <div class="brand"><span class="logo">▦</span><span>API Table Viewer</span></div>
     <button id="toggleSidebar" class="btn ghost" aria-controls="requestSidebar" aria-expanded="true" title="收起左侧接口列表">收起列表</button>
+    <details id="appearanceMenu" class="appearance-menu">
+      <summary id="appearanceToggle" class="btn ghost appearance-toggle" aria-controls="appearancePanel" title="配色、字体与显示密度"><span aria-hidden="true">◐</span> 外观设置</summary>
+      <div id="appearancePanel" class="appearance-panel" aria-label="外观设置">
+        <div class="appearance-heading"><div><strong>让界面更顺眼</strong><p>即时生效，自动记住你的选择</p></div><button id="appearanceClose" class="icon-btn" aria-label="关闭外观设置">×</button></div>
+        <fieldset><legend>整体配色</legend><div class="appearance-palettes">
+          <button class="appearance-palette palette-graphite" data-theme-choice="graphite" aria-pressed="true"><span class="palette-preview" aria-hidden="true"><i></i><i></i><i></i></span>石墨紫</button>
+          <button class="appearance-palette palette-ocean" data-theme-choice="ocean" aria-pressed="false"><span class="palette-preview" aria-hidden="true"><i></i><i></i><i></i></span>深海蓝</button>
+          <button class="appearance-palette palette-forest" data-theme-choice="forest" aria-pressed="false"><span class="palette-preview" aria-hidden="true"><i></i><i></i><i></i></span>松林绿</button>
+          <button class="appearance-palette palette-paper" data-theme-choice="paper" aria-pressed="false"><span class="palette-preview" aria-hidden="true"><i></i><i></i><i></i></span>暖白</button>
+        </div></fieldset>
+        <fieldset><legend>强调色</legend><div class="appearance-accents">
+          <button class="accent-choice accent-violet" data-accent-choice="#8b9dff" aria-label="鸢尾紫" aria-pressed="true"></button>
+          <button class="accent-choice accent-blue" data-accent-choice="#4ea1ff" aria-label="晴空蓝" aria-pressed="false"></button>
+          <button class="accent-choice accent-teal" data-accent-choice="#52c9a5" aria-label="薄荷绿" aria-pressed="false"></button>
+          <button class="accent-choice accent-amber" data-accent-choice="#edb35c" aria-label="琥珀金" aria-pressed="false"></button>
+          <button class="accent-choice accent-rose" data-accent-choice="#ed87a8" aria-label="玫瑰粉" aria-pressed="false"></button>
+          <label class="appearance-custom" for="appearanceAccent">自选 <input id="appearanceAccent" type="color" value="#8b9dff" aria-label="自定义强调色"></label>
+        </div><span id="appearanceAccentValue" class="appearance-color-value">#8B9DFF</span></fieldset>
+        <div class="appearance-options"><label for="appearanceFont">数据字号<select id="appearanceFont"><option value="12">12 px</option><option value="13" selected>13 px</option><option value="14">14 px</option><option value="15">15 px</option><option value="16">16 px</option></select></label><label for="appearanceDensity">表格密度<select id="appearanceDensity"><option value="comfortable" selected>舒适</option><option value="compact">紧凑</option></select></label></div>
+        <label class="appearance-check"><input id="appearanceStriped" type="checkbox" checked> 隔行底色，方便横向阅读</label>
+        <div class="appearance-footer"><span id="appearanceStatus" role="status" aria-live="polite">设置仅影响当前扩展的外观</span><button id="appearanceReset" class="btn ghost">恢复默认</button></div>
+      </div>
+    </details>
   </header>
 
   <div id="responseMockBar" class="response-mock-bar hidden" role="status"><span id="responseMockSummary"></span><button id="responseMockRefresh" class="btn ghost">更新状态</button><button id="responseMockStopAll" class="btn ghost">停用全部替换</button></div>
