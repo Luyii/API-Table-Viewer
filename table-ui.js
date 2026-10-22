@@ -1,10 +1,11 @@
 // Content previews are capped; full field names always define the minimum width.
 let tableMeasureContext;
 function measureTableText(value,header=false){
+  const size=typeof Appearance!=='undefined'?Appearance.fontSize:13;
   const text=header?String(value??''):String(value??'').slice(0,240);
   if(tableMeasureContext===undefined){try{tableMeasureContext=document.createElement('canvas').getContext?.('2d')||null;}catch{tableMeasureContext=null;}}
-  if(tableMeasureContext){tableMeasureContext.font=header?'650 13px "Segoe UI","Microsoft YaHei",sans-serif':'13px Consolas,Monaco,monospace';return tableMeasureContext.measureText(text).width;}
-  return [...text].reduce((width,c)=>width+(c.codePointAt(0)>255?13:7.8),0);
+  if(tableMeasureContext){tableMeasureContext.font=header?`650 ${size}px "Segoe UI","Microsoft YaHei",sans-serif`:`${size}px Consolas,Monaco,monospace`;return tableMeasureContext.measureText(text).width;}
+  return [...text].reduce((width,c)=>width+(c.codePointAt(0)>255?size:size*.6),0);
 }
 function tableHeaderMinWidth(col){
   // Padding, sort arrow, gap and resize handle must not cover the field name.
@@ -44,7 +45,7 @@ function createTableHeader(col,rows,width){
 // Keep widths stable across paging/sorting, with a bounded cache per response and array.
 const tableWidthStates=new Map();
 let currentTableWidths=new Map(),currentTableColumns=[],currentWidthKey=null;
-function tableWidthKey(){return selected?.rid && tableState.path?JSON.stringify([selected.rid,tableState.path]):null;}
+function tableWidthKey(){return selected?.rid && tableState.path?JSON.stringify([selected.rid,tableState.path,typeof Appearance!=='undefined'?Appearance.fontSize:13]):null;}
 function widthState(){
   const key=tableWidthKey();if(!key)return {auto:new Map(),manual:new Map()};
   if(!tableWidthStates.has(key)){tableWidthStates.set(key,{auto:new Map(),manual:new Map()});if(tableWidthStates.size>32)tableWidthStates.delete(tableWidthStates.keys().next().value);}
@@ -81,3 +82,18 @@ function bindColumnResize(th,col){
 }
 async function refitTableColumns(){const state=widthState();state.manual.clear();state.auto.clear();return renderTable();}
 $('#refitColumns').onclick=safe(refitTableColumns);
+
+// A font change only resizes rendered columns; response parsing and DOM rows stay intact.
+document.addEventListener('appearancechange',()=>{
+  if(!currentTableColumns.length || !tableState.rows.length || !tableWidthKey())return;
+  const widths=resolvedTableWidths(currentTableColumns,tableState.rows);
+  for(const [index,col] of currentTableColumns.entries()){
+    const width=widths.get(col),column=$('#tableColumns').children[index],header=$('#dataTable thead').children[0]?.children[index];
+    if(column)column.style.width=width+'px';
+    if(header){
+      header.style.width=width+'px';const grip=header.querySelector('.column-resizer');
+      if(grip){grip.setAttribute('aria-valuenow',String(width));grip.setAttribute('aria-valuemin',String(tableHeaderMinWidth(col)));grip.setAttribute('aria-valuemax',String(Math.max(960,tableHeaderMinWidth(col))));}
+    }
+  }
+  $('#dataTable').style.width=[...widths.values()].reduce((sum,width)=>sum+width,0)+'px';
+});

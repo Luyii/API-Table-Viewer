@@ -4,7 +4,7 @@ const http = require('node:http');
 const fs = require('node:fs');
 const path = require('node:path');
 const root = path.resolve(__dirname, '../..');
-const runtime = new Set(['json-codec.js', 'panel.js', 'table-ui.js', 'viewer.js', 'viewer-expanded.js', 'developer.js', 'layout.js', 'shortcuts.js', 'response-editor.js', 'mock-page.js', 'response-mock.js', 'worker.js', 'style.css', 'field-patch-core.js', 'field-mock.js']);
+const runtime = new Set(['appearance.js', 'json-codec.js', 'panel.js', 'table-ui.js', 'viewer.js', 'viewer-expanded.js', 'developer.js', 'layout.js', 'shortcuts.js', 'response-editor.js', 'mock-page.js', 'response-mock.js', 'worker.js', 'style.css', 'field-patch-core.js', 'field-mock.js']);
 function createPreviewServer() {
   return http.createServer((req, res) => {
     const pathname = new URL(req.url, 'http://localhost').pathname;

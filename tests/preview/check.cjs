@@ -30,7 +30,7 @@ test('preview server serves panel/runtime assets and rejects unrelated files', a
     assert.equal(response.status, 200);
     const html = await response.text();
     assert(html.includes('/preview/env.js')); assert(html.includes('id="responseEditor"'));
-    for (const route of ['/preview/env.js', '/preview/boot.js', '/worker.js', '/response-editor.js', '/style.css']) assert.equal((await fetch(origin + route)).status, 200);
+    for (const route of ['/preview/env.js', '/preview/boot.js', '/worker.js', '/appearance.js', '/response-editor.js', '/style.css']) assert.equal((await fetch(origin + route)).status, 200);
     assert.equal((await fetch(origin + '/package.json')).status, 404);
     assert.equal((await fetch(origin + '/', {method: 'POST'})).status, 405);
   } finally {await new Promise(resolve => server.close(resolve));}
