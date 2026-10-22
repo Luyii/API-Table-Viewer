@@ -1,0 +1,61 @@
+<div id="api-response-preview">
+  <div class="app atv-preview-chrome"><span>▦ &nbsp; API Table Viewer</span><span class="atv-preview-label">响应编辑 · 示例数据</span><button id="editResponseBtn" class="btn">编辑响应</button></div>
+  <!-- EDITOR_MARKUP -->
+  <section class="atv-page-demo"><div class="atv-page-demo-head"><strong>网页效果演示</strong><span>模拟请求，不连接网站</span><button id="responseMockDemoRequest" class="btn">模拟页面再次请求</button></div><p id="responseMockDemoSource" role="status">原始响应 · HTTP 200</p><table><thead><tr><th>客户</th><th>状态</th><th>金额</th></tr></thead><tbody><tr><td id="responseMockDemoName">林小满</td><td id="responseMockDemoStatus">paid</td><td id="responseMockDemoAmount">128.5</td></tr></tbody></table></section>
+  <div id="toast" class="atv-preview-toast" role="status" aria-live="polite"></div>
+</div>
+<style>
+/* EDITOR_STYLES */
+</style>
+<script>
+(()=>{
+  const root=document.getElementById('api-response-preview');
+  const $=selector=>root.querySelector(selector);
+  const original='{"code":200,"data":{"orderId":9007199254740993,"customerName":"林小满","status":"paid","amount":128.50,"createdAt":"2026-10-22 10:30:00","remark":"标准订单"}}';
+  const selected={valid:true,method:'GET',url:'https://demo.local/api/orders?page=1',rid:'preview',meta:{bytes:new TextEncoder().encode(original).byteLength}};
+  const callWorker=async()=>({text:original});
+  function closeModal(){}
+  function toast(message){$('#toast').textContent=message;}
+  const safe=fn=>(...args)=>{try{return Promise.resolve(fn(...args)).catch(error=>toast(error.message));}catch(error){toast(error.message);return Promise.resolve();}};
+  function copyText(text){
+    if(navigator.clipboard?.writeText)return navigator.clipboard.writeText(text).then(()=>toast('已复制草稿'),()=>toast('请选中编辑内容后手动复制'));
+    $('#responseEditorInput').focus();$('#responseEditorInput').select();toast('已选中草稿，请复制');
+  }
+  // CODEC_SCRIPT
+  function pathText(path){return 'root'+path.map(part=>Number.isInteger(part)?`[${part}]`:/^[A-Za-z_$][\w$]*$/.test(part)?'.'+part:'['+stringifyJson(part)+']').join('');}
+  const ResponseMock=(()=>{
+    let rule=null;const listeners=[];
+    const notify=()=>listeners.forEach(fn=>fn());
+    return {
+      get(){return {active:!!rule?.enabled,busy:false,error:'',reloading:false,rule:rule?{...rule}:null};},
+      subscribe(fn){listeners.push(fn);},
+      async enable(item,body,options){
+        ResponseEditor.validate(body);
+        if(!Number.isInteger(options.status) || options.status<200 || options.status>599 || [204,205,304].includes(options.status))throw Error('请填写支持 JSON 正文的 HTTP 状态码');
+        rule={body,status:options.status,once:options.once,enabled:true,hits:rule?.body===body && rule.status===options.status && rule.once===options.once?rule.hits:0,lastKind:''};notify();toast('演示规则已启用，可点击下方“模拟页面再次请求”');
+      },
+      async disable(){if(rule)rule.enabled=false;notify();toast('演示规则已停用');},
+      async reload(){simulateRequest();},
+      receive(){
+        if(!rule?.enabled)return {body:original,status:200,mocked:false};
+        rule.hits++;rule.lastKind='Fetch';if(rule.once)rule.enabled=false;
+        const result={body:rule.body,status:rule.status,mocked:true};notify();return result;
+      }
+    };
+  })();
+  function simulateRequest(){
+    const response=ResponseMock.receive();
+    $('#responseMockDemoSource').textContent=(response.mocked?'模拟响应':'原始响应')+' · HTTP '+response.status;
+    let data;try{data=parseJsonExact(response.body).data;}catch{}
+    $('#responseMockDemoName').textContent=response.status>=400?'接口返回错误':String(data?.customerName??'—');
+    $('#responseMockDemoStatus').textContent=response.status>=400?'—':String(data?.status??'—');
+    $('#responseMockDemoAmount').textContent=response.status>=400?'—':String(data?.amount??'—');
+  }
+  $('#responseMockDemoRequest').onclick=simulateRequest;
+  // EDITOR_SCRIPT
+  ResponseEditor.open().then(()=>{
+    $('#responseEditorInput').value=ResponseEditor.format(original).replace('林小满','用于测试布局的超长用户名').replace('"paid"','"cancelled"').replace('128.50','-999.99');
+    ResponseEditor.update();
+  }).catch(error=>toast(error.message));
+})();
+</script>

@@ -3,6 +3,7 @@
 <title>API Table Viewer 本地验收</title>
 <style>body{font:16px/1.6 system-ui;max-width:1000px;margin:32px auto;padding:0 20px;background:#f5f7fb;color:#182438}button{font:inherit;margin:5px;padding:8px 14px;cursor:pointer}section,pre{background:white;padding:20px;border:1px solid #ccd3df;border-radius:8px}pre{white-space:pre-wrap;overflow-wrap:anywhere;max-height:350px;overflow:auto}small{display:block}</style>
 <h1>API Table Viewer 本地验收</h1>
+<p><a href="/mock-debug">响应替换联调：编辑接口后验证网页表格变化 →</a></p>
 <p>先安装仓库根目录扩展，打开 DevTools → API Table，再点击发送。这里仅产生真实 HTTP 请求，不模拟扩展界面。没有自动请求，刷新后可复测捕获顺序。</p>
 <section id="cases"></section>
 <p><button id="all">顺序发送全部案例</button><button id="echo">POST 原文大整数请求体</button><button id="plain">非 JSON</button><button id="status">422 JSON</button><button id="clear">清空页面日志</button></p>

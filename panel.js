@@ -66,6 +66,7 @@ async function addRequest(req, jsonRaw, generation=captureGeneration) {
   requests.unshift(item);renderList();
 }
 function resetDetail(){
+  if(typeof ResponseEditor!=="undefined")ResponseEditor.reset();
   selected=null;selectionVersion++;tableVersion++;clearTimeout(window.st);
   tableState={path:null,page:1,pageSize:100,query:"",sortKey:null,dir:1,columns:[],rows:[],total:0};
   $("#detail").classList.add("hidden");$("#emptyState").classList.remove("hidden");
@@ -123,6 +124,7 @@ function renderNode(meta,parent,root=false,path=[]) {
   head.innerHTML=`<span class="caret ${expandable?"":"leaf"}">${expandable?"▶":""}</span><span class="node-key">${root?"root":esc(path[path.length-1])}</span><span class="node-type ${typeClass(meta.type)}">${esc(expandable?meta.label:meta.type)}</span>${!expandable?`<span class="node-preview">${esc(meta.label)}</span>`:""}`;
   if(meta.type==="array") {const b=document.createElement("button");b.className="mini-btn";b.textContent="▦ 表格";b.onclick=safe(e=>{e.stopPropagation();return openTable(path);});head.appendChild(b);}
   if(root){const b=document.createElement("button");b.className="mini-btn";b.textContent="查看";b.onclick=safe(e=>{e.stopPropagation();return showValue(path,"root");});head.appendChild(b);}
+  if(!expandable && typeof FieldMock!=='undefined')FieldMock.bind(head.querySelector('.node-preview'),selected,path,meta.type);
   wrap.appendChild(head); parent.appendChild(wrap);
   const children=document.createElement("div"); children.className="node-children hidden"; wrap.appendChild(children);
   if(expandable){
@@ -161,6 +163,7 @@ function renderChildren(list,parent){
     } else {
       const b=document.createElement("button"); b.className="copy-mini"; b.textContent="复制值"; b.onclick=safe(e=>{e.stopPropagation();return callWorker("value",{rid:selected.rid,path:basePath}).then(r=>copyText(c.type==="string"?JSON.parse(r.text):r.text));}); head.appendChild(b);
     }
+    if(!expandable && typeof FieldMock!=='undefined')FieldMock.bind(head.querySelector('.node-preview'),selected,basePath,c.type);
     wrap.appendChild(head);
     const child=document.createElement("div"); child.className="node-children hidden"; wrap.appendChild(child);
     parent.appendChild(wrap);
@@ -239,6 +242,9 @@ async function renderTable(navigate=false){
           const b=document.createElement("button");b.className="expand-cell";b.textContent="查看";
           b.onclick=safe(()=>showValue(cell.path,col));content.appendChild(b);
         }else td.ondblclick=safe(()=>copyText(text));
+        if(typeof FieldMock!=='undefined' && cell.path && !complex && cell.type!=='undefined'){
+          td.ondblclick=null;FieldMock.bind(span,selected,cell.path,cell.type,td);
+        }
         tr.appendChild(td);
       }
       tbody.appendChild(tr);

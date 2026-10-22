@@ -1,5 +1,6 @@
 // Shortcuts apply while focus is inside the extension panel.
 function activeSearchScope(){
+  if(typeof ResponseEditor!=='undefined' && !$('#responseEditor').classList.contains('hidden'))return null;
   if(!$('#modal').classList.contains('hidden'))return viewerState?'viewer':null;
   const active=document.activeElement;
   if(active===$('#searchInput') || active?.closest?.('#requestSidebar'))return 'requests';

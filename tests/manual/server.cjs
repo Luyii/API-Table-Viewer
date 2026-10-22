@@ -3,7 +3,7 @@ const http = require('node:http');
 const fs = require('node:fs');
 const path = require('node:path');
 const {cases, fixture} = require('./fixtures.cjs');
-const assets = {'/': ['index.html', 'text/html'], '/app.js': ['app.js', 'text/javascript']};
+const assets = {'/': ['index.html', 'text/html'], '/app.js': ['app.js', 'text/javascript'], '/mock-debug': ['mock-debug.html', 'text/html'], '/mock-debug.js': ['mock-debug.js', 'text/javascript']};
 function createServer() {
   return http.createServer(async (req, res) => {
     const url = new URL(req.url, 'http://localhost');
@@ -28,6 +28,7 @@ function createServer() {
       send(200, fs.readFileSync(path.join(__dirname, file)), type); return;
     }
     if (url.pathname === '/api/cases') {send(200, JSON.stringify(cases)); return;}
+    if (url.pathname === '/api/mock-orders') {send(200, JSON.stringify({code:200,data:{total:2,records:[{orderId:'ORD202610220001',customerName:'林小满',status:'paid',amount:128.5},{orderId:'ORD202610220002',customerName:'陈一诺',status:'pending',amount:299}]}})); return;}
     if (url.pathname === '/api/plain') {send(200, 'not JSON', 'text/plain'); return;}
     if (url.pathname === '/api/status') {send(422, '{"error":"fixture validation","code":422}'); return;}
     const match = /^\/api\/(ordinary|nested|nodes|records|integers|long-text|missing)$/.exec(url.pathname);

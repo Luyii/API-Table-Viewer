@@ -54,6 +54,7 @@ async function navigateViewer(path,{targetPath=null,forceLazy=false,collapsed=fa
   } else if(doc.complete){
     appendViewerContentActions(host,s,path);
     const text=document.createElement('pre');text.className='viewer-scalar';highlightText(text,doc.text,s.query);host.appendChild(text);
+    if(typeof FieldMock!=='undefined')FieldMock.bind(text,selected?.rid===s.rid?selected:null,path,doc.meta.type);
     const mark=text.querySelector('mark');if(mark)mark.scrollIntoView({block:'nearest',inline:'nearest'});
   } else await viewerScalar(path,-1,s,version);
 }
@@ -92,6 +93,7 @@ async function viewerNode(meta,path,parent,auto=false,targetPath=null){
   const toggle=viewerButton(expandable?'▶':'·',()=>load(0));toggle.disabled=!expandable;row.appendChild(toggle);
   const key=document.createElement('span');key.className='viewer-key';highlightText(key,path.length?String(path.at(-1)):'root',s.query);row.appendChild(key);
   const value=document.createElement('span');value.className='viewer-value type-'+meta.type;highlightText(value,meta.label,s.query);row.appendChild(value);
+  if(typeof FieldMock!=='undefined')FieldMock.bind(value,selected?.rid===s.rid?selected:null,path,meta.type);
   row.appendChild(viewerButton('进入',()=>navigateViewer(path)));
   row.appendChild(viewerButton('路径',()=>copyText(pathText(path))));
   row.appendChild(viewerButton('复制',async()=>{const r=await callWorker('value',{rid:s.rid,path});await copyText(r.text);}));

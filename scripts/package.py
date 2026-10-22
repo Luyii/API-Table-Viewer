@@ -9,7 +9,9 @@ ROOT = Path(__file__).resolve().parent.parent
 RUNTIME = (
     "manifest.json", "devtools.html", "devtools.js", "panel.html", "panel.js",
     "style.css", "json-codec.js", "worker.js", "viewer.js", "viewer-expanded.js",
-    "developer.js", "table-ui.js", "layout.js", "shortcuts.js",
+    "developer.js", "table-ui.js", "layout.js", "shortcuts.js", "response-editor.js",
+    "mock-page.js", "response-mock.js",
+    "field-patch-core.js", "field-mock.js", "field-mock-page.js", "field-mock-bridge.js", "field-mock-background.js",
 )
 DOCS = ("README.md", "CHANGELOG.md", "CHECK_REPORT.md", "CONTRIBUTING.md")
 

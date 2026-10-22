@@ -1,0 +1,8 @@
+<!doctype html>
+<html lang="zh-CN">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>响应替换 · 页面联调验收</title>
+<style>body{font:15px/1.65 system-ui;margin:32px auto;padding:0 20px;max-width:1050px;background:#f3f6fa;color:#203044}h1{font-size:26px;margin-bottom:8px}section{background:white;border:1px solid #d3dce8;padding:20px;border-radius:10px;margin:18px 0}button{font:inherit;background:#e9f0fa;color:#183f70;border:1px solid #b9cbe1;padding:7px 13px;border-radius:5px;margin:4px;cursor:pointer}table{border-collapse:collapse;width:100%;font-size:14px}th,td{text-align:left;border-bottom:1px solid #e0e7ef;padding:10px}th{color:#52657c}pre{white-space:pre-wrap;overflow-wrap:anywhere;background:#172232;color:#dceaff;padding:16px;border-radius:6px;max-height:300px;overflow:auto}#source{color:#58708d}#error{color:#b8253b}a{color:#245eaa}</style></head>
+<body><a href="/">← 本地验收首页</a><h1>修改接口响应，验证网页展示</h1><p>此页面使用真实 Fetch / XHR 请求，不内置 Mock。先打开 DevTools → API Table，再发送请求。</p>
+<section><button id="fetchOrders">Fetch 查询订单</button><button id="xhrOrders">XHR 查询订单</button><span id="source" role="status">尚未请求</span><p id="error" role="alert"></p><table><thead><tr><th>订单号</th><th>客户</th><th>状态</th><th>金额</th></tr></thead><tbody id="orders"><tr><td colspan="4">点击查询加载订单</td></tr></tbody></table></section>
+<section><strong>操作顺序</strong><ol><li>点击查询，在插件中选中 <code>/api/mock-orders</code>。</li><li>打开“编辑响应”，修改客户名、状态或金额，点击“启用替换”。</li><li>回到本页，再点击 Fetch 或 XHR 查询，检查表格与下方响应。</li><li>测试初始化请求时，启用规则后点击插件中的“刷新网页并应用”。</li><li>单次规则命中后自动结束；持续规则需手动停用。普通刷新不会自动重新安装规则。</li></ol></section>
+<h2>页面实际收到的响应</h2><pre id="response">等待请求</pre><script src="/mock-debug.js"></script></body></html>
