@@ -1,5 +1,7 @@
 # 开发与架构
 
+适用版本：v1.5.1。返回 [文档中心](README.md)。
+
 ## 环境与命令
 
 清单声明 Chrome 114+，用于 Manifest V3、MAIN world 内容脚本与扩展会话存储。开发检查需要 Node.js 18+ 和 Python 3，预览生成检查与打包只使用 Python 标准库，没有 npm 依赖。
@@ -40,7 +42,7 @@ python3 scripts/package.py
 | `tests/` | 回归测试与静态加载检查 |
 | `scripts/package.py` | 白名单打包、清单与 ZIP 完整性检查 |
 
-## 数据流和状态
+## 数据流与状态管理
 
 1.5.0 的默认调试路径是原位标量编辑。`field-mock.js` 将表格、数据树与查看器中的值绑定到 Worker 路径；提交时只请求 `patchTarget`，取得原值、类型、字段路径和数组行标识。修改以补丁保存，不调用整份响应编辑器，也不运行整份 JSON diff。Worker 中的捕获记录保持原样。
 
@@ -52,7 +54,7 @@ MAIN world 的 `field-mock-page.js` 在 `document_start` 安装 Fetch / XHR 包�
 
 编辑不直接改变 Vue / React 的状态。页面需要再次请求或刷新才能展示变化；退出也只影响后续响应。原始响应的导出和 Network 核对不被补丁覆盖。未修改字段使用最新后端数据，但响应仍需解析 / 序列化，因此字段补丁不意味着大响应处理零开销。
 
-`response-editor.js`、`response-mock.js` 和 `mock-page.js` 是此前整份替换实验的保留模块与回归基线，可见入口已隐藏，不属于 1.5.0 默认操作流程。其测试验证独立引擎的旧行为，不代表字段响应模拟 绕过真实后端。
+`response-editor.js`、`response-mock.js` 和 `mock-page.js` 是此前整份替换实验的保留模块与回归基线，可见入口已隐藏，不属于 1.5.0 默认操作流程。其测试验证独立引擎的旧行为，不代表字段级响应模拟 绕过真实后端。
 
 执行 `npm run preview` 后访问 http://localhost:8766，可用示例数据打开真实面板与 Worker；只有 DevTools 的宿主接口被替代。此预览不验证扩展安装或网页响应替换。`python3 tests/preview/build-preview.py /absolute/path/preview.html` 可生成同一面板的独立预览，不生成扩展 ZIP。
 
@@ -72,7 +74,7 @@ DevTools 的请求完成事件以及初始 `getHAR` 补录读取响应正文，�
 - 新功能需考虑缓存淘汰、请求切换、弹框关闭以及无响应读取方法的 HAR 项。
 - localStorage 保存布局、保留导航记录和页大小等偏好，不保存响应历史。
 
-## 发布
+## 版本交付
 
 1. 功能变更同步 `manifest.json`、`package.json` 与更新记录。
 2. 运行 `npm test`，再按 Chrome 操作流程完成 [发布检查](TESTING.md)。
@@ -81,7 +83,7 @@ DevTools 的请求完成事件以及初始 `getHAR` 补录读取响应正文，�
 5. 上传源码仓库前检查是否意外加入响应数据、HAR、Cookie 或密钥。
 
 
-## 1.5.1 浏览与捕获约束
+## 查看器与请求捕获约束
 
 - 请求捕获的状态和注册函数必须位于顶层；DOMContentLoaded 后启动，禁止放进 activateTab 等视图函数。回归覆盖不切换视图时捕获 localhost JSON、HAR 正文、BOM 和有限重试取消。
 - 标量单击复制使用 valueText；可编辑标量经 FieldMock 的单击延迟隔离双击编辑。对象 / 数组标签不绑定复制，复制按钮阻断事件冒泡，读取完整 value JSON。
