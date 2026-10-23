@@ -55,7 +55,7 @@ npm run test:manual
 
 命令与执行记录汇总见 [测试说明](TESTING.md)。
 
-## 原位字段 Mock 验收（1.5.0）
+## 原位字段响应模拟 验收（1.5.0）
 
 更新扩展后关闭、重开 DevTools 并刷新目标网页，以安装新的启动脚本。打开本地服务的 `/mock-debug`，自动加载订单。API Table 中选择 `/api/mock-orders`，打开 `data.records` 表格。
 

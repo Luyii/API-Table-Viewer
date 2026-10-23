@@ -52,7 +52,7 @@ MAIN world 的 `field-mock-page.js` 在 `document_start` 安装 Fetch / XHR 包�
 
 编辑不直接改变 Vue / React 的状态。页面需要再次请求或刷新才能展示变化；退出也只影响后续响应。原始响应的导出和 Network 核对不被补丁覆盖。未修改字段使用最新后端数据，但响应仍需解析 / 序列化，因此字段补丁不意味着大响应处理零开销。
 
-`response-editor.js`、`response-mock.js` 和 `mock-page.js` 是此前整份替换实验的保留模块与回归基线，可见入口已隐藏，不属于 1.5.0 默认操作流程。其测试验证独立引擎的旧行为，不代表字段 Mock 绕过真实后端。
+`response-editor.js`、`response-mock.js` 和 `mock-page.js` 是此前整份替换实验的保留模块与回归基线，可见入口已隐藏，不属于 1.5.0 默认操作流程。其测试验证独立引擎的旧行为，不代表字段响应模拟 绕过真实后端。
 
 执行 `npm run preview` 后访问 http://localhost:8766，可用示例数据打开真实面板与 Worker；只有 DevTools 的宿主接口被替代。此预览不验证扩展安装或网页响应替换。`python3 tests/preview/build-preview.py /absolute/path/preview.html` 可生成同一面板的独立预览，不生成扩展 ZIP。
 
