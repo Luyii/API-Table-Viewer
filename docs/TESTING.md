@@ -33,8 +33,9 @@ npm test
 
 1. Node.js 18、22、24 分别运行 `npm test`。
 2. 测试全部通过后，使用 Node.js 24 和 Python 3.12 打包并验证 ZIP。
-3. 仅申请仓库读取权限，不安装项目依赖、不发布产物。
-4. 任一命令失败会使对应任务失败；并发取消和超时规则以工作流文件为准。
+3. 测试和打包任务仅申请仓库读取权限，不安装项目依赖；验证通过后上传 ZIP Artifact，保留 30 天。
+4. 本次正式发布仅由 main 上提交消息精确为 `release: publish v1.5.1` 的推送触发；发布任务单独申请 contents: write，复验下载的 ZIP，拒绝覆盖已有标签或 Release。先上传草稿附件，再公开发布。
+5. 任一命令失败会使对应任务失败；并发取消和超时规则以工作流文件为准。
 
 检查当前结果：[GitHub Actions](https://github.com/Luyii/API-Table-Viewer/actions/workflows/ci.yml)。
 
@@ -84,3 +85,11 @@ ZIP 验证包括文件白名单、重复条目、完整性、源码一致性和�
 - CI：[运行 39915059290](https://github.com/Luyii/API-Table-Viewer/actions/runs/39915059290) 的 Node.js 18 / 22 / 24 和打包检查通过，对应提交 `663b5dd`。
 - 用户已确认 fix8 测试包完成测试；未留存逐案例 Chrome 版本和结果表，因此不扩展为完整跨平台认证。
 - 更早的验证过程见 [历史测试记录](TEST_HISTORY.md) 和 [历史修复报告](../CHECK_REPORT.md)。
+
+## v1.5.1 正式发布复核（2026-10-23）
+
+- 源码基线：`0df3d4115151b77b415818dba4c9a9235c26ff4e`；main 无开放问题，未发现已登记的关键发布阻断项。
+- 基线 CI：[运行 39917291861](https://github.com/Luyii/API-Table-Viewer/actions/runs/39917291861) 在 Node.js 18、22、24 上测试和 ZIP 检查成功。
+- 本次本地环境：Node.js 24.19.0、Python 3.12.14；`npm test` 全部通过。实际 ZIP 白名单、源码字节一致性、完整性、清单根目录和解压资源检查通过；重复构建字节一致。
+- 本次没有执行真实 Chrome 扩展加载、DevTools 捕获、刷新后规则恢复或跨平台手工验收。沿用 fix8 用户验收记录，不能扩展为逐案例认证。
+- 发布任务以本次提交 SHA 为标签目标，附件来自该提交成功 CI 的构建产物；最终远端运行及附件状态以 Actions / Release 页面为准。

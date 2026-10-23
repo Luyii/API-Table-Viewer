@@ -32,4 +32,22 @@
 
 103 项主回归、其余自动检查、ZIP 检查和对应 CI 运行通过。用户已确认 fix8 测试包完成测试；自动化中的 DOM / DevTools 模拟不等同于真实 Chrome 自动化。证据和范围见 [测试与验证](TESTING.md#v151-验证记录)。
 
-本版本不扩展字段模拟的协议或容量边界；具体支持范围见 [项目概述](../README.md#支持范围与边界)。本文是仓库版本说明，不代表已创建正式 GitHub Release 或商店发布。
+本版本不扩展字段模拟的协议或容量边界；具体支持范围见 [项目概述](../README.md#支持范围与边界)。发布状态以 GitHub Releases 页面为准；本版本不发布到 Chrome Web Store。
+
+## 下载与安装
+
+在本版本 Release 的 Assets 下载 `API-Table-Viewer-v1.5.1.zip`，不要将自动生成的 Source code ZIP 与扩展安装包混淆。可使用同页 `SHA256SUMS.txt` 核对 SHA-256。
+
+1. 完整解压 ZIP 到固定目录，确认 `manifest.json` 直接位于该目录根部。
+2. 打开 `chrome://extensions`，开启开发者模式，点击“加载已解压的扩展程序”并选择该目录。
+3. 在目标网页打开 DevTools → API Table，刷新网页并触发 JSON 接口。
+
+需要 Chrome 114+。字段模拟仅支持主页面 Fetch 和异步 XHR 的 JSON 文本 / JSON 响应，不覆盖 Worker、iframe、WebSocket 或流式协议；响应查看仍受既有 20 MiB 边界限制。重新加载扩展可能清除会话规则。
+
+## 发布验证记录
+
+- 基线 `0df3d411` 的 CI 39917291861 已通过 Node.js 18 / 22 / 24 测试和 ZIP 检查。
+- 本次本地 Node.js 24.19.0 / Python 3.12.14：完整 `npm test`、ZIP 白名单与完整性、源码字节一致性、解压资源检查和重复打包一致性通过。
+- 正式附件由本次发布提交的成功 CI 构建，并在上传前再次验证解压资源。
+- 本次未执行真实 Chrome 加载、真实站点捕获、刷新恢复或跨平台手工检查。既有 fix8 用户验收缺少逐案例环境记录；自动模拟测试不能替代这些检查。
+- 许可状态保持 `UNLICENSED`，本次发布不授予额外许可。
