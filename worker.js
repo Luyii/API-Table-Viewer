@@ -148,19 +148,64 @@ function* walkNodes(value,path){
   }
 }
 let expansionSeq=0;
+function expansionProjection(state){
+  if(state.projection)return state.projection;
+  const segments=[];let cursor=0,total=0;
+  const append=end=>{if(end>cursor){segments.push({start:cursor,end,offset:total});total+=end-cursor;}};
+  for(const index of [...state.collapsed].sort((a,b)=>a-b)){
+    if(index<cursor)continue; // A collapsed parent already hides this row.
+    append(index+1);cursor=state.rows[index].end??state.rows.length;
+  }
+  append(state.rows.length);
+  return state.projection={segments,total};
+}
+function expansionSummary(state){return {total:expansionProjection(state).total,indexedTotal:state.rows.length,collapsedCount:state.collapsed.size,done:state.done};}
 function viewerExpansion(rec,data){
   if(data.cmd==='viewerExpandStart'){
-    const path=data.path||[];rec.expansion={token:String(++expansionSeq),iterator:walkNodes(getAt(rec.obj,path),path),rows:[],done:false};
-    return {token:rec.expansion.token};
+    const path=data.path||[],token=String(++expansionSeq);
+    if(!rec.expansions)rec.expansions=new Map();
+    rec.expansions.set(token,{token,iterator:walkNodes(getAt(rec.obj,path),path),rows:[],open:[],collapsed:new Set(),projection:null,done:false});
+    return {token};
   }
-  if(data.cmd==='viewerExpandRelease'){if(rec.expansion?.token===data.token)rec.expansion=null;return true;}
-  const state=rec.expansion;if(!state || state.token!==data.token)throw Error('展开任务已结束');
+  if(data.cmd==='viewerExpandRelease'){rec.expansions?.delete(data.token);return true;}
+  const state=rec.expansions?.get(data.token);if(!state)throw Error('展开任务已结束');
   if(data.cmd==='viewerExpandStep'){
-    for(let n=0;n<1000&&!state.done;n++){const next=state.iterator.next();if(next.done){state.done=true;state.iterator=null;}else state.rows.push(next.value);}
-    return {total:state.rows.length,done:state.done};
+    for(let n=0;n<1000&&!state.done;n++){
+      const next=state.iterator.next();
+      if(next.done){
+        state.done=true;state.iterator=null;
+        while(state.open.length)state.rows[state.open.pop()].end=state.rows.length;
+      }else{
+        const entry=next.value,index=state.rows.length;
+        while(state.open.length && state.rows[state.open.at(-1)].path.length>=entry.path.length)state.rows[state.open.pop()].end=index;
+        state.rows.push(entry);
+        if(entry.value!==null && typeof entry.value==='object')state.open.push(index);
+      }
+    }
+    state.projection=null;return expansionSummary(state);
   }
-  const start=Math.max(0,Number(data.start)||0),end=Math.min(state.rows.length,start+Math.min(200,Number(data.limit)||80));
-  return {start,total:state.rows.length,rows:state.rows.slice(start,end).map(({value,path})=>({path,type:typeOf(value),label:viewerLabel(value,data.query||'')}))};
+  if(data.cmd==='viewerExpandToggle'){
+    const row=Number.isInteger(data.index)?state.rows[data.index]:null;
+    if(!row || row.value===null || typeof row.value!=='object' || typeof data.collapsed!=='boolean')throw Error('此节点不能展开或收起');
+    if(data.collapsed)state.collapsed.add(data.index);
+    else{
+      state.collapsed.delete(data.index);
+      if(data.recursive)for(const index of state.collapsed)if(index>data.index && index<(row.end??state.rows.length))state.collapsed.delete(index);
+    }
+    state.projection=null;return expansionSummary(state);
+  }
+  const {segments,total}=expansionProjection(state),start=Math.min(total,Math.max(0,Math.floor(Number(data.start)||0))),limit=Math.max(1,Math.min(200,Math.floor(Number(data.limit)||80))),rows=[];
+  let low=0,high=segments.length;
+  while(low<high){const mid=(low+high)>>1,segment=segments[mid];if(segment.offset+segment.end-segment.start<=start)low=mid+1;else high=mid;}
+  let position=start;
+  for(let i=low;i<segments.length && rows.length<limit;i++){
+    const segment=segments[i];
+    for(let index=segment.start+Math.max(0,position-segment.offset);index<segment.end && rows.length<limit;index++,position++){
+      const {value,path}=state.rows[index];
+      rows.push({index,path,type:typeOf(value),label:viewerLabel(value,data.query||''),expanded:value!==null && typeof value==='object' && !state.collapsed.has(index)});
+    }
+  }
+  return {start,total,rows,...expansionSummary(state)};
 }
 function viewerSearch(rec,data){
   const q=String(data.query||'').trim().toLowerCase(),path=data.path||[],key=stringifyJson([path,q]);

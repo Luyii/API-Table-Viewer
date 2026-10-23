@@ -1,11 +1,19 @@
 let viewerState=null, viewerEpoch=0;
 function disposeViewer(){
+  if(typeof releaseInlineArrayScopes==='function' && viewerState)releaseInlineArrayScopes(viewerState);
   if(typeof releaseViewerExpansion==='function')releaseViewerExpansion(viewerState);
   viewerEpoch++;
   if(viewerState)void callWorker('viewerSearchRelease',{rid:viewerState.rid}).catch(()=>{});
   viewerState=null;
 }
 function viewerButton(label,fn){const b=document.createElement('button');b.className='mini-btn';b.textContent=label;b.onclick=safe(e=>{e.stopPropagation();return fn();});return b;}
+function setArrayBulkButton(button,expanded){
+  button.textContent=expanded?'⊟':'⊞';button.setAttribute('aria-expanded',String(expanded));
+  button.title=expanded?'折叠此数组全部项':'展开此数组全部层级';button.setAttribute('aria-label',button.title);
+}
+function arrayBulkButton(){
+  const button=document.createElement('button');button.className='mini-btn array-bulk-toggle';setArrayBulkButton(button,false);return button;
+}
 async function openJsonViewer(rid,path,title){
   showModal(title,'正在加载 JSON…');
   const state={rid,home:[...path],path:[...path],query:'',rendered:0,epoch:++viewerEpoch,version:0,searchVersion:0};viewerState=state;
@@ -26,7 +34,7 @@ function appendViewerContentActions(host,s,path){
   host.appendChild(bar);
 }
 async function navigateViewer(path,{targetPath=null,forceLazy=false,collapsed=false,expandAll=false}={}){
-  const s=viewerState;if(!s)return;if(typeof releaseViewerExpansion==='function')releaseViewerExpansion(s);const version=++s.version;s.path=[...path];s.focusPath=targetPath?[...targetPath]:null;s.focusRow=null;s.rendered=0;
+  const s=viewerState;if(!s)return;if(typeof releaseInlineArrayScopes==='function')releaseInlineArrayScopes(s);if(typeof releaseViewerExpansion==='function')releaseViewerExpansion(s);const version=++s.version;s.path=[...path];s.focusPath=targetPath?[...targetPath]:null;s.focusRow=null;s.rendered=0;
   setViewerExpandToggle(collapsed);
   const displayPath=s.focusPath||path;
   modalSource={rid:s.rid,path:[...displayPath]};
@@ -54,6 +62,7 @@ async function navigateViewer(path,{targetPath=null,forceLazy=false,collapsed=fa
   } else if(doc.complete){
     appendViewerContentActions(host,s,path);
     const text=document.createElement('pre');text.className='viewer-scalar';highlightText(text,doc.text,s.query);host.appendChild(text);
+    bindValueCopy(text,s.rid,path);
     if(typeof FieldMock!=='undefined')FieldMock.bind(text,selected?.rid===s.rid?selected:null,path,doc.meta.type);
     const mark=text.querySelector('mark');if(mark)mark.scrollIntoView({block:'nearest',inline:'nearest'});
   } else await viewerScalar(path,-1,s,version);
@@ -63,7 +72,7 @@ async function viewerScalar(path,page,s,version){
   const data=await callWorker('valuePage',{rid:s.rid,path,page,query:s.query});if(viewerState!==s || s.version!==version || request!==s.scalarRequest)return;
   const host=$('#modalContent');host.textContent='';
   appendViewerContentActions(host,s,path);
-  const text=document.createElement('pre');text.className='viewer-scalar';highlightText(text,data.text,s.query);host.appendChild(text);
+  const text=document.createElement('pre');text.className='viewer-scalar';highlightText(text,data.text,s.query);host.appendChild(text);bindValueCopy(text,s.rid,path);
   const tools=document.createElement('div');tools.className='viewer-page';
   const prev=viewerButton('上一段',()=>viewerScalar(path,data.page-1,s,version));prev.disabled=data.page===0;
   const next=viewerButton('下一段',()=>viewerScalar(path,data.page+1,s,version));next.disabled=data.page>=data.pages-1;
@@ -93,13 +102,16 @@ async function viewerNode(meta,path,parent,auto=false,targetPath=null){
   const toggle=viewerButton(expandable?'▶':'·',()=>load(0));toggle.disabled=!expandable;row.appendChild(toggle);
   const key=document.createElement('span');key.className='viewer-key';highlightText(key,path.length?String(path.at(-1)):'root',s.query);row.appendChild(key);
   const value=document.createElement('span');value.className='viewer-value type-'+meta.type;highlightText(value,meta.label,s.query);row.appendChild(value);
+  if(!['array','object'].includes(meta.type))bindValueCopy(value,s.rid,path);
   if(typeof FieldMock!=='undefined')FieldMock.bind(value,selected?.rid===s.rid?selected:null,path,meta.type,row);
+  const bulk=meta.type==='array'?arrayBulkButton():null;if(bulk)row.appendChild(bulk);
+  if(expandable)row.appendChild(complexCopyButton(s.rid,path));
   row.appendChild(viewerButton('进入',()=>navigateViewer(path)));
   row.appendChild(viewerButton('路径',()=>copyText(pathText(path))));
-  row.appendChild(viewerButton('复制',async()=>{const r=await callWorker('value',{rid:s.rid,path});await copyText(r.text);}));
   wrap.appendChild(row);const child=document.createElement('div');child.className='viewer-children hidden';child.setAttribute('role','group');wrap.appendChild(child);parent.appendChild(wrap);
   let open=false,busy=false;
-  async function load(offset=0,force=false){
+  async function load(...args){return loadChildren(...args);}
+  async function loadChildren(offset=0,force=false){
     if(busy || viewerState!==s || s.version!==version)return;
     if(open && !force){child.classList.add('hidden');toggle.textContent='▶';row.setAttribute('aria-expanded','false');open=false;if(path.length===s.path.length&&path.every((k,i)=>k===s.path[i]))setViewerExpandToggle(true);return;}
     if(child.dataset.loaded && !force){child.classList.remove('hidden');toggle.textContent='▼';row.setAttribute('aria-expanded','true');open=true;setViewerExpandToggle(false);return;}
@@ -124,6 +136,10 @@ async function viewerNode(meta,path,parent,auto=false,targetPath=null){
       child.dataset.loaded='1';
     }finally{busy=false;toggle.disabled=false;}
   }
+  if(bulk)bindInlineArrayBulk(bulk,row,child,{
+    rid:s.rid,path,owner:s,isCurrent:()=>viewerState===s && s.version===version && child.isConnected!==false,
+    setOpen:expanded=>{open=expanded;toggle.textContent=expanded?'▼':'▶';row.setAttribute('aria-expanded',String(expanded));if(path.length===s.path.length && path.every((key,index)=>key===s.path[index]))setViewerExpandToggle(!expanded);}
+  });
   if(auto && expandable)await load();
 }
 function renderViewerMatches(s){

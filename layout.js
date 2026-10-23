@@ -46,3 +46,12 @@ sidebarResizer.onkeydown=e=>{
 };
 window.addEventListener('resize',applySidebarLayout);window.addEventListener('blur',finishSidebarDrag);
 applySidebarLayout();
+
+// Keep the disclosure reachable while all detail controls are hidden.
+const detailControlsToggle=$('#toggleDetailControls');
+detailControlsToggle.onclick=()=>{
+  const collapsed=$('#detail').classList.toggle('detail-controls-collapsed');
+  detailControlsToggle.setAttribute('aria-expanded',String(!collapsed));
+  const label=collapsed?'展开上方工具区':'收起上方工具区';
+  detailControlsToggle.setAttribute('aria-label',label);detailControlsToggle.title=label;
+};

@@ -10,7 +10,7 @@ let tableState = {path:null,page:1,pageSize:100,query:"",sortKey:null,dir:1,colu
 let modalCopyText="", modalSource=null, modalVersion=0;
 let selectionVersion=0, tableVersion=0, captureGeneration=0;
 const safe = fn => (...args) => {try{return Promise.resolve(fn(...args)).catch(e=>toast(e.message||"操作失败"));}catch(e){toast(e.message||"操作失败");return Promise.resolve();}};
-worker.onerror = () => { for(const p of pending.values()) p.reject(Error("Worker 异常，请重新打开 DevTools")); pending.clear(); toast("Worker 异常，请重新打开 DevTools"); };
+worker.onerror = () => { window.CaptureStatus?.update({error:"Worker 异常，请重新打开 DevTools"}); for(const p of pending.values()) p.reject(Error("Worker 异常，请重新打开 DevTools")); pending.clear(); toast("Worker 异常，请重新打开 DevTools"); };
 worker.onmessageerror = worker.onerror;
 
 function callWorker(cmd, data={}) {
@@ -57,15 +57,16 @@ function typeClass(type){ return "type-"+type; }
 async function addRequest(req, jsonRaw, generation=captureGeneration) {
   if(jsonRaw.length>20*1024*1024) return;
   let meta;
-  try {meta=await callWorker("parse",{raw:jsonRaw});} catch(e) {if(!/JSON|Unexpected|position|token/i.test(e.message))toast(e.message);return;}
+  try {meta=await callWorker("parse",{raw:jsonRaw});} catch(e) {window.CaptureStatus?.update({error:"解析响应失败："+e.message});if(!/JSON|Unexpected|position|token/i.test(e.message))toast(e.message);return;}
   if(generation!==captureGeneration){await callWorker("release",{rid:meta.rid});return;}
   const gone=new Set(meta.evicted);
   requests=requests.filter(x=>!gone.has(x.rid));
   if(selected && gone.has(selected.rid)){resetDetail();toast("当前数据已达到缓存期限，已释放");}
   const item={id:crypto.randomUUID(),url:req.request.url,method:req.request.method||"GET",status:req.response.status||0,time:Math.round(req.time||0),rid:meta.rid,valid:true,meta,details:snapshotRequest(req)};
-  requests.unshift(item);renderList();
+  requests.unshift(item);window.CaptureStatus?.count('accepted');renderList();
 }
 function resetDetail(){
+  if(typeof releaseInlineArrayScopes==='function')releaseInlineArrayScopes();
   if(typeof ResponseEditor!=="undefined")ResponseEditor.reset();
   selected=null;selectionVersion++;tableVersion++;clearTimeout(window.st);
   tableState={path:null,page:1,pageSize:100,query:"",sortKey:null,dir:1,columns:[],rows:[],total:0};
@@ -111,6 +112,22 @@ async function selectRequest(item) {
   if(version!==selectionVersion)return;
   activateTab("tree");
 }
+function complexCopyButton(rid,path){
+  const currentPath=[...path],button=document.createElement('button');
+  button.className='mini-btn complex-copy';button.textContent='复制';button.title='复制完整 JSON';
+  button.onclick=safe(async event=>{event.stopPropagation();const result=await callWorker('value',{rid,path:currentPath});return copyText(result.text);});
+  button.ondblclick=event=>event.stopPropagation();return button;
+}
+function bindValueCopy(element,rid,path,text){
+  if(!element)return;
+  const currentPath=path?[...path]:null;
+  element.title=(element.title||'')+'\n单击复制完整值';
+  element.onclick=safe(async event=>{
+    event.stopPropagation();if(event.detail>1)return;
+    const result=currentPath?await callWorker('valueText',{rid,path:currentPath}):{text};
+    return copyText(result.text);
+  });
+}
 async function renderTreeRoot(item=selected,version=selectionVersion){
   const tree=$("#tree"); tree.innerHTML="";
   const meta=await callWorker("children",{rid:item.rid,path:[]});
@@ -122,8 +139,11 @@ function renderNode(meta,parent,root=false,path=[]) {
   const head=document.createElement("div"); head.className="node-head";
   const expandable=["object","array"].includes(meta.type);
   head.innerHTML=`<span class="caret ${expandable?"":"leaf"}">${expandable?"▶":""}</span><span class="node-key">${root?"root":esc(path[path.length-1])}</span><span class="node-type ${typeClass(meta.type)}">${esc(expandable?meta.label:meta.type)}</span>${!expandable?`<span class="node-preview">${esc(meta.label)}</span>`:""}`;
+  const bulk=meta.type==="array"?arrayBulkButton():null;if(bulk)head.appendChild(bulk);
+  if(expandable)head.appendChild(complexCopyButton(selected.rid,path));
   if(meta.type==="array") {const b=document.createElement("button");b.className="mini-btn";b.textContent="▦ 表格";b.onclick=safe(e=>{e.stopPropagation();return openTable(path);});head.appendChild(b);}
   if(root){const b=document.createElement("button");b.className="mini-btn";b.textContent="查看";b.onclick=safe(e=>{e.stopPropagation();return showValue(path,"root");});head.appendChild(b);}
+  if(!expandable)bindValueCopy(head.querySelector('.node-preview'),selected.rid,path);
   if(!expandable && typeof FieldMock!=='undefined')FieldMock.bind(head.querySelector('.node-preview'),selected,path,meta.type,head);
   wrap.appendChild(head); parent.appendChild(wrap);
   const children=document.createElement("div"); children.className="node-children hidden"; wrap.appendChild(children);
@@ -144,6 +164,10 @@ function renderNode(meta,parent,root=false,path=[]) {
       } catch(e){children.innerHTML=`<div class="error">加载失败：${esc(e.message)}</div>`;}
     };
   }
+  if(bulk){
+    const item=selected,version=selectionVersion;
+    bindInlineArrayBulk(bulk,head,children,{rid:item.rid,path,isCurrent:()=>selected===item && selectionVersion===version && children.isConnected!==false,setOpen:expanded=>{head.querySelector('.caret').textContent=expanded?'▼':'▶';}});
+  }
 }
 function renderChildren(list,parent){
   for(const c of list){
@@ -153,6 +177,8 @@ function renderChildren(list,parent){
     const key=typeof c.key==="number"?`[${c.key}]`:c.key;
     const basePath=c.path;
     head.innerHTML=`<span class="caret ${expandable?"":"leaf"}">${expandable?"▶":""}</span><span class="node-key">${esc(key)}</span><span class="node-type ${typeClass(c.type)}">${esc(expandable?c.label:c.type)}</span>${!expandable?`<span class="node-preview">${esc(c.preview)}</span>`:""}`;
+    const bulk=c.type==='array'?arrayBulkButton():null;if(bulk)head.appendChild(bulk);
+    if(expandable)head.appendChild(complexCopyButton(selected.rid,basePath));
     if(expandable) {
       const actions=document.createElement("span"); actions.className="node-actions";
       if(c.type==="array") {
@@ -160,9 +186,8 @@ function renderChildren(list,parent){
       }
       const v=document.createElement("button"); v.className="mini-btn"; v.textContent="查看"; v.onclick=safe(e=>{e.stopPropagation();return showValue(basePath,key);}); actions.appendChild(v);
       head.appendChild(actions);
-    } else {
-      const b=document.createElement("button"); b.className="copy-mini"; b.textContent="复制值"; b.onclick=safe(e=>{e.stopPropagation();return callWorker("value",{rid:selected.rid,path:basePath}).then(r=>copyText(c.type==="string"?JSON.parse(r.text):r.text));}); head.appendChild(b);
     }
+    if(!expandable)bindValueCopy(head.querySelector('.node-preview'),selected.rid,basePath);
     if(!expandable && typeof FieldMock!=='undefined')FieldMock.bind(head.querySelector('.node-preview'),selected,basePath,c.type,head);
     wrap.appendChild(head);
     const child=document.createElement("div"); child.className="node-children hidden"; wrap.appendChild(child);
@@ -183,6 +208,10 @@ function renderChildren(list,parent){
           child.dataset.loaded="1";
         }catch(e){child.innerHTML=`<div class="error">加载失败：${esc(e.message)}</div>`;}
       };
+    }
+    if(bulk){
+      const item=selected,version=selectionVersion;
+      bindInlineArrayBulk(bulk,head,child,{rid:item.rid,path:basePath,isCurrent:()=>selected===item && selectionVersion===version && child.isConnected!==false,setOpen:expanded=>{head.querySelector('.caret').textContent=expanded?'▼':'▶';}});
     }
   }
 }
@@ -231,17 +260,15 @@ async function renderTable(navigate=false){
         const content=document.createElement("div");content.className="cell-content";
         const span=document.createElement("span");span.className="cell-text"+(complex?" cell-complex":"");span.title=cell.type==="undefined"?"此行没有该字段":cell.type==="string"&&text===""?"空字符串":text;
         highlightText(span,cell.type==="undefined"?"—":cell.type==="string"&&text===""?'""':text,tableState.query);content.appendChild(span);td.appendChild(content);
-        if(cell.path){
-          span.classList.add("cell-viewable");span.title=span.title+"\n点击查看此字段";
-          span.tabIndex=0;span.setAttribute("role","button");
-          span.onclick=safe(e=>{e.stopPropagation();return showValue(cell.path,col);});
-          span.onkeydown=safe(e=>{if(e.key==="Enter" || e.key===" "){e.preventDefault();return showValue(cell.path,col);}});
-        }
         if(cell.matched){const badge=document.createElement("span");badge.className="match-badge";badge.textContent="内部匹配";content.appendChild(badge);}
         if(cell.expand && cell.path){
           const b=document.createElement("button");b.className="expand-cell";b.textContent="查看";
-          b.onclick=safe(()=>showValue(cell.path,col));content.appendChild(b);
-        }else td.ondblclick=safe(()=>copyText(text));
+          b.onclick=safe(event=>{event.stopPropagation();return showValue(cell.path,col);});b.ondblclick=event=>event.stopPropagation();content.appendChild(b);
+        }
+        if(complex && cell.path)content.appendChild(complexCopyButton(selected.rid,cell.path));
+        if(!complex && cell.type!=="undefined"){
+          bindValueCopy(span,selected.rid,cell.path,text);
+        }
         if(typeof FieldMock!=='undefined' && cell.path && !complex && cell.type!=='undefined'){
           td.ondblclick=null;FieldMock.bind(span,selected,cell.path,cell.type,td);
         }
@@ -266,8 +293,67 @@ function renderPagination(total){
   const info=document.createElement("span");info.className="page-info";info.textContent=`${tableState.page} / ${pages}`;p.appendChild(info);
   const next=document.createElement("button");next.className="page-btn";next.textContent="›";next.disabled=tableState.page>=pages;next.onclick=()=>{tableState.page++;renderTable();};p.appendChild(next);
 }
+const seen=new WeakSet(), observed=new WeakSet(), unreadable=new WeakSet(), recent=new Map();
+const requestKey=r=>r.startedDateTime?stringifyJson([r.startedDateTime,r.request?.url,r.request?.method,r.time,r.response?.status]):null;
+function capture(req,attempt=0){
+  if(!req?.request?.url)return;
+  if(!observed.has(req)){observed.add(req);window.CaptureStatus?.count('received');}
+  if(seen.has(req))return;
+  const key=requestKey(req);if(key && recent.has(key))return;
+  const generation=captureGeneration;
+  const ct=(req.response?.headers||[]).find(h=>h.name.toLowerCase()==="content-type")?.value?.toLowerCase()||req.response?.content?.mimeType?.toLowerCase()||"";
+  if(/^(image|audio|video|font)\//.test(ct))return;
+  if(req.response?.content?.size>20*1024*1024)return;
+  const retry=()=>{
+    if(attempt>=3 || generation!==captureGeneration || seen.has(req))return;
+    setTimeout(()=>{if(generation===captureGeneration)capture(req,attempt+1);},250*(attempt+1));
+  };
+  try{const receive=(body,encoding)=>{
+    if(generation!==captureGeneration)return;
+    if(chrome.runtime.lastError || !body){if(!unreadable.has(req)){unreadable.add(req);window.CaptureStatus?.count('empty');}retry();return;}
+    try {
+      if(encoding==="base64") {const binary=atob(body);body=new TextDecoder().decode(Uint8Array.from(binary,c=>c.charCodeAt(0)));}
+      if(body.length>20*1024*1024)return;
+      if(ct.includes("json") || /^[\s\uFEFF]*[\[{]/.test(body)){
+        // HAR can expose an entry before its body is readable. Deduplicate only
+        // after a usable body arrives so onRequestFinished can retry that entry.
+        if(seen.has(req) || key && recent.has(key))return;
+        seen.add(req);
+        if(key){recent.set(key,true);if(recent.size>500)recent.delete(recent.keys().next().value);}
+        void safe(addRequest)(req,body,generation);
+      }
+    } catch(e){toast("响应解码失败："+e.message);}
+  };
+  if(typeof req.getContent==='function')req.getContent(receive);
+  else if(typeof req.response?.content?.text==='string')receive(req.response.content.text,req.response.content.encoding);
+  else{window.CaptureStatus?.update({error:'收到请求但 Chrome 未提供正文读取接口，请刷新网页后重试'});}
+  }catch(e){retry();if(attempt===3)toast("无法读取接口响应："+e.message);}
+}
+let networkCaptureStarted=false;
+function startNetworkCapture(){
+  if(networkCaptureStarted)return;
+  try{
+    chrome.devtools.network.onRequestFinished.addListener(capture);
+    networkCaptureStarted=true;
+    window.CaptureStatus?.update({started:true});
+  }catch(e){
+    $("#requestList").textContent="接口监听启动失败，请关闭并重开 DevTools："+e.message;
+    window.CaptureStatus?.update({error:e.message});toast("接口监听启动失败");return;
+  }
+  const bootstrapGeneration=captureGeneration;
+  try{chrome.devtools.network.getHAR(har=>{
+    if(chrome.runtime.lastError){toast("历史接口读取失败，正在监听新请求；请刷新网页");return;}
+    if(bootstrapGeneration!==captureGeneration)return;
+    for(const req of har?.entries||[])capture(req);
+  });}catch(e){toast("历史接口读取失败，正在监听新请求；请刷新网页");}
+}
+// Initialize capture after the companion scripts and saved preferences are ready.
+if(document.readyState==='loading')document.addEventListener("DOMContentLoaded",startNetworkCapture,{once:true});
+else setTimeout(startNetworkCapture,0);
+
 function activateTab(name){
-  $$(".tab").forEach(t=>t.classList.toggle("active",t.dataset.tab===name));
+
+$$(".tab").forEach(t=>t.classList.toggle("active",t.dataset.tab===name));
   $("#treePanel").classList.toggle("hidden",name!=="tree");
   $("#tablePanel").classList.toggle("hidden",name!=="table");
   $("#rawPanel").classList.toggle("hidden",name!=="raw");
@@ -363,42 +449,5 @@ $("#tableSearch").onkeydown=safe(e=>{if(e.key==="Enter"){e.preventDefault();if(w
 $("#copyMdBtn").onclick=toMarkdown;
 $("#csvBtn").onclick=toCSV;
 
-const seen=new WeakSet(), recent=new Map();
-const requestKey=r=>r.startedDateTime?stringifyJson([r.startedDateTime,r.request?.url,r.request?.method,r.time,r.response?.status]):null;
-function capture(req){
-  if(!req?.request?.url || typeof req.getContent!=="function")return;
-  if(seen.has(req))return;
-  const key=requestKey(req);if(key && recent.has(key))return;
-  const generation=captureGeneration;
-  const ct=(req.response?.headers||[]).find(h=>h.name.toLowerCase()==="content-type")?.value?.toLowerCase()||req.response?.content?.mimeType?.toLowerCase()||"";
-  if(/^(image|audio|video|font)\//.test(ct))return;
-  if(req.response?.content?.size>20*1024*1024)return;
-  req.getContent((body,encoding)=>{
-    if(chrome.runtime.lastError || generation!==captureGeneration || !body)return;
-    try {
-      if(encoding==="base64") {const binary=atob(body);body=new TextDecoder().decode(Uint8Array.from(binary,c=>c.charCodeAt(0)));}
-      if(body.length>20*1024*1024)return;
-      if(ct.includes("json") || /^[\s]*[\[{]/.test(body)){
-        // HAR can expose an entry before its body is readable. Deduplicate only
-        // after a usable body arrives so onRequestFinished can retry that entry.
-        if(seen.has(req) || key && recent.has(key))return;
-        seen.add(req);
-        if(key){recent.set(key,true);if(recent.size>500)recent.delete(recent.keys().next().value);}
-        void safe(addRequest)(req,body,generation);
-      }
-    } catch(e){toast("响应解码失败："+e.message);}
-  });
-}
-let networkCaptureStarted=false;
-function startNetworkCapture(){
-  if(networkCaptureStarted)return;
-  networkCaptureStarted=true;
-  chrome.devtools.network.onRequestFinished.addListener(capture);
-  const bootstrapGeneration=captureGeneration;
-  chrome.devtools.network.getHAR(har=>{if(chrome.runtime.lastError || bootstrapGeneration!==captureGeneration)return;for(const req of har.entries||[])capture(req);});
-}
-// Initialize capture after the companion scripts and saved preferences are ready.
-if(document.readyState==='loading')document.addEventListener("DOMContentLoaded",startNetworkCapture,{once:true});
-else setTimeout(startNetworkCapture,0);
 // All UI promises report errors instead of producing unhandled rejections.
 for(const el of document.querySelectorAll("button"))if(el.onclick)el.onclick=safe(el.onclick);

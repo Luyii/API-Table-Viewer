@@ -5,12 +5,21 @@
 Chrome DevTools 中的 JSON 接口调试工具。把响应展开成可搜索的表格和数据树，直接双击字段构造测试数据，让真实页面在下一次请求中使用修改后的响应。
 
 [![CI](https://github.com/Luyii/API-Table-Viewer/actions/workflows/ci.yml/badge.svg)](https://github.com/Luyii/API-Table-Viewer/actions/workflows/ci.yml)
-![Version](https://img.shields.io/badge/version-1.5.0-2563eb)
+![Version](https://img.shields.io/badge/version-1.5.1-2563eb)
 ![Chrome](https://img.shields.io/badge/Chrome-114%2B-4285f4)
 ![Manifest](https://img.shields.io/badge/Manifest-V3-16a34a)
 ![Dependencies](https://img.shields.io/badge/runtime_dependencies-0-0f766e)
 
-[快速开始](#快速开始) · [v1.5.0 更新](#v150--field-level-response-mocking) · [工作原理](#工作原理) · [测试说明](docs/TESTING.md) · [更新记录](CHANGELOG.md)
+[快速开始](#快速开始) · [v1.5.1 更新](#v151--浏览交互与捕获稳定性) · [工作原理](#工作原理) · [测试说明](docs/TESTING.md) · [更新记录](CHANGELOG.md)
+
+## v1.5.1 · 浏览交互与捕获稳定性
+
+- **更顺畅地看数据**：数组扁平展开独立于逐行操作，收起后保留一级内容；移除重复 Array 层和嵌套小滚动区，主区域统一滚动，大数据继续按窗口渲染。
+- **更直接地操作**：普通字段值单击复制、双击 / F2 编辑；对象与数组点行展开，独立按钮复制完整 JSON，操作区靠右。
+- **更多可视空间**：顶部细条一键收起工具区，Ctrl / ⌘+F 可浮动搜索，Esc 关闭。
+- **更可靠地捕获**：修正启动监听注册，补充正文重试、HAR 正文与 BOM 识别，增加捕获状态和 localhost 回归。
+
+完整记录见 [更新记录](CHANGELOG.md)。下方保留 v1.5.0 字段 Mock 的设计介绍。
 
 ## v1.5.0 · Field-level Response Mocking
 
@@ -51,7 +60,7 @@ Chrome DevTools 中的 JSON 接口调试工具。把响应展开成可搜索的�
 | --- | --- |
 | 请求捕获 | JSON 响应、已有 Network 记录补录、URL / 方法 / 状态筛选、保留导航记录 |
 | 表格分析 | 全数组搜索、匹配高亮与跨页定位、排序、分页、列显隐、自动列宽与拖动调整 |
-| JSON 浏览 | 普通数据默认展开；大数据分批遍历、虚拟滚动；字段路径跳转与搜索定位 |
+| JSON 浏览 | 普通数据默认展开；大数据分批遍历、虚拟滚动；字段路径跳转与搜索定位；数组旁符号按钮可扁平展开全部层级 / 恢复一级展示 |
 | 长内容查看 | 单元格摘要、完整值弹框、分段文本与完整复制 |
 | 请求复现 | 请求详情、请求体 JSON、Bash / WSL / Git Bash 格式 cURL |
 | 数据导出 | 原始响应、当前节点、全部筛选和排序后的 CSV / Markdown / JSON |
@@ -114,7 +123,7 @@ python3 tests/package-archive.py
 
 | 检查 | 范围 |
 | --- | --- |
-| 89 项回归 | JSON 解析、精度、排序、搜索、导出、缓存、异步状态与界面逻辑 |
+| 103 项回归 | JSON 解析、精度、排序、搜索、导出、缓存、异步状态与界面逻辑 |
 | 8 个 HTTP / Worker 子案例 | 本地接口、较大记录集、长文本与解析联动 |
 | 15 项字段 Mock 检查 | 补丁、稳定行定位、Fetch / XHR、启动请求、会话恢复、隔离、取消与退出 |
 | 18 项响应替换回归 | 原替换引擎、规则更新、单次消费、超时释放与控制器 |
@@ -123,7 +132,7 @@ python3 tests/package-archive.py
 
 GitHub Actions 在 push / pull_request 时以 Node.js 18、22、24 执行检查，再验证 ZIP。实际运行结果见上方 CI 标记；本地自动检查中的 DOM / Chrome API 模拟不替代真实浏览器验收，详见 [测试说明](docs/TESTING.md)。
 
-`npm run test:manual` 启动本地复现服务，访问 http://127.0.0.1:8765 。`/mock-debug` 提供真实 Fetch / XHR 订单页面，便于验证编辑、刷新保留和退出恢复。步骤见 [Chrome 复现指南](docs/CHROME_REPRO.md)。打包产物为 `dist/API-Table-Viewer-v1.5.0.zip`。
+`npm run test:manual` 启动本地复现服务，访问 http://127.0.0.1:8765 。`/mock-debug` 提供真实 Fetch / XHR 订单页面，便于验证编辑、刷新保留和退出恢复。步骤见 [Chrome 复现指南](docs/CHROME_REPRO.md)。打包产物为 `dist/API-Table-Viewer-v1.5.1.zip`。
 
 ## 文档
 

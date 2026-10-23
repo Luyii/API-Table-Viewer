@@ -24,6 +24,43 @@ await test('locating index 724 loads its batch rather than the first batch',()=>
 await test('complete viewer includes all moderate arrays and full strings',()=>{const text='x'.repeat(3000)+'END',rid=parse(JSON.stringify({list:Array.from({length:350},(_,i)=>i),text}));const r=call('viewerDocument',{rid,path:[]});assert(r.complete);assert.equal(r.meta.fullChildren[0].fullChildren.length,350);assert(r.meta.fullChildren[1].label.includes(text));});
 await test('large viewer documents are refused before full serialization',()=>{const rid=parse(JSON.stringify(Array.from({length:6000},(_,i)=>i)));const r=call('viewerDocument',{rid,path:[]});assert(!r.complete);assert(r.reason.includes('5,000'));assert(!Object.hasOwn(r,'meta'));});
 await test('expanded large viewer traverses every node and pages visible rows',()=>{const rid=parse(JSON.stringify(Array.from({length:6000},(_,i)=>({value:i}))));const {token}=call('viewerExpandStart',{rid,path:[]});let r;do{r=call('viewerExpandStep',{rid,token});}while(!r.done);assert.equal(r.total,12001);const tail=call('viewerExpandRows',{rid,token,start:11999,limit:5});assert.deepEqual(tail.rows.at(-1).path,[5999,'value']);assert.equal(tail.rows.at(-1).label,'5999');call('viewerExpandRelease',{rid,token});assert.throws(()=>call('viewerExpandRows',{rid,token}));});
+await test('expanded rows fold independently and remember nested collapsed state',()=>{
+  const rid=parse(JSON.stringify({items:[{nested:{name:'first'},value:1},{nested:{name:'second'},value:2}],'a.b':{value:3},a:{b:{value:4}}}));
+  const {token}=call('viewerExpandStart',{rid,path:[]});let state;do{state=call('viewerExpandStep',{rid,token});}while(!state.done);
+  const total=state.total,read=()=>call('viewerExpandRows',{rid,token,limit:200}).rows;
+  const find=path=>read().find(row=>JSON.stringify(row.path)===JSON.stringify(path));
+  const outer=find(['items',0]),inner=find(['items',0,'nested']);
+  call('viewerExpandToggle',{rid,token,index:inner.index,collapsed:true});assert.equal(read().length,total-1);assert(!find(['items',0,'nested','name']));
+  call('viewerExpandToggle',{rid,token,index:outer.index,collapsed:true});assert.equal(read().length,total-3);assert(find(['items',1,'nested','name']));
+  call('viewerExpandToggle',{rid,token,index:outer.index,collapsed:false});assert.equal(read().length,total-1);assert.equal(find(['items',0,'nested']).expanded,false);
+  call('viewerExpandToggle',{rid,token,index:inner.index,collapsed:false});assert.equal(read().length,total);
+  const dotted=find(['a.b']);call('viewerExpandToggle',{rid,token,index:dotted.index,collapsed:true});assert(find(['a','b','value']));assert(!find(['a.b','value']));
+  call('viewerExpandToggle',{rid,token,index:0,collapsed:true});assert.equal(read().length,1);
+  call('viewerExpandToggle',{rid,token,index:0,collapsed:false});assert.equal(read().length,total-1);assert.equal(find(['a.b']).expanded,false);
+  assert.throws(()=>call('viewerExpandToggle',{rid,token,index:find(['items',0,'value']).index,collapsed:true}));
+});
+await test('collapsing during incremental expansion hides future descendants and reopening restores virtual pages',()=>{
+  const rid=parse(JSON.stringify({large:Array.from({length:5001},(_,i)=>i)})),{token}=call('viewerExpandStart',{rid,path:[]});
+  let state=call('viewerExpandStep',{rid,token});assert(!state.done);
+  call('viewerExpandToggle',{rid,token,index:1,collapsed:true});
+  do{state=call('viewerExpandStep',{rid,token});assert.equal(state.total,2);}while(!state.done);
+  assert.equal(state.indexedTotal,5003);assert.equal(call('viewerExpandRows',{rid,token,start:0,limit:200}).rows.length,2);
+  call('viewerExpandToggle',{rid,token,index:1,collapsed:false});
+  const tail=call('viewerExpandRows',{rid,token,start:5001,limit:10});assert.equal(tail.total,5003);assert.deepEqual(tail.rows.at(-1).path,['large',5000]);
+  assert(call('viewerExpandRows',{rid,token,start:1,limit:1000}).rows.length<=200);
+});
+await test('array bulk expansion resets only its descendants and multiple expansion sessions stay independent',()=>{
+  const rid=parse(JSON.stringify({a:[{nested:{value:1}}],b:[{value:2}]})),{token}=call('viewerExpandStart',{rid,path:[]});
+  let result;do{result=call('viewerExpandStep',{rid,token});}while(!result.done);
+  const read=()=>call('viewerExpandRows',{rid,token,limit:200}).rows,find=path=>read().find(row=>JSON.stringify(row.path)===JSON.stringify(path));
+  const a=find(['a']),nested=find(['a',0,'nested']),b=find(['b']);
+  call('viewerExpandToggle',{rid,token,index:nested.index,collapsed:true});call('viewerExpandToggle',{rid,token,index:b.index,collapsed:true});
+  call('viewerExpandToggle',{rid,token,index:a.index,collapsed:true,recursive:true});
+  call('viewerExpandToggle',{rid,token,index:a.index,collapsed:false,recursive:true});assert(find(['a',0,'nested','value']));assert.equal(find(['b']).expanded,false);
+  const second=call('viewerExpandStart',{rid,path:['b']}).token;do{result=call('viewerExpandStep',{rid,token:second});}while(!result.done);
+  assert(find(['a',0,'nested','value']));assert.equal(call('viewerExpandRows',{rid,token:second}).total,3);
+  call('viewerExpandRelease',{rid,token:second});assert(find(['a']));assert.throws(()=>call('viewerExpandRows',{rid,token:second}));
+});
 await test('unsafe integer response values retain digits across views and sorting',()=>{const rid=parse('[{"id":9007199254740993},{"id":9007199254740992}]');const r=table(rid,{sortKey:'id',preview:true});assert.equal(r.rows[0].id.text,'9007199254740992');assert.equal(r.rows[1].id.text,'9007199254740993');assert.equal(call('value',{rid,path:[0,'id']}).text,'9007199254740993');assert(call('viewerDocument',{rid,path:[]}).meta.fullChildren[0].fullChildren[0].label.includes('9007199254740993'));});
 await test('empty-name fields do not sort implicitly but can be sorted explicitly',()=>{const rid=parse('[{"":2},{"":1}]');assert.deepEqual(table(rid).rows.map(r=>r['']),[2,1]);assert.deepEqual(table(rid,{sortKey:''}).rows.map(r=>r['']),[1,2]);});
 await test('UTF-8 BOM does not prevent JSON loading',()=>{const rid=parse('\ufeff{"ok":true}');assert.equal(call('value',{rid,path:['ok']}).text,'true');});
@@ -31,9 +68,12 @@ await test('missing cells have no invalid detail path',()=>{const r=table(parse(
 // Minimal DOM harness exercises actual panel script, with asynchronous structured-clone Worker messages.
 class El {
  constructor(){this.children=[];this.style={};this.dataset={};this.value='';this._text='';this._html='';this.classList={values:new Set(),add(...x){x.forEach(v=>this.values.add(v));},remove(...x){x.forEach(v=>this.values.delete(v));},contains(x){return this.values.has(x);},toggle(x,on){on?this.add(x):this.remove(x);}};}
+ set className(v){this.classList.values=new Set(String(v).split(/\s+/).filter(Boolean));}get className(){return [...this.classList.values].join(' ');}
  set textContent(v){this._text=String(v??'');this.children=[];}get textContent(){return this._text+this.children.map(x=>x.textContent).join('');}
  set innerHTML(v){this._html=v;this.children=[];}get innerHTML(){return this._html;}
  appendChild(x){this.children.push(x);x.parent=this;return x;}remove(){if(this.parent)this.parent.children=this.parent.children.filter(x=>x!==this);}
+ addEventListener(name,fn){this.listeners??={};(this.listeners[name]??=[]).push(fn);}
+ removeEventListener(name,fn){if(this.listeners?.[name])this.listeners[name]=this.listeners[name].filter(item=>item!==fn);}
  scrollIntoView(options){this.scrolled=options;}
  focus(){this.focused=true;}
  getAttribute(name){return this[name];}
@@ -45,10 +85,10 @@ class El {
 }
 const els=new Map(),get=s=>{if(!els.has(s))els.set(s,new El());return els.get(s);},buttons=[];
 const document={querySelector:get,querySelectorAll:s=>s==='.tab'?['tree','table','raw'].map(name=>{const e=get('tab-'+name);e.dataset.tab=name;return e;}):buttons,createElement:tag=>{const e=new El();if(tag==='button')buttons.push(e);return e;},createTextNode:t=>{const e=new El();e.textContent=t;return e;},body:new El(),addEventListener(){},execCommand:()=>true};
-let delay=()=>0,copied='',blob,navigated;
+let delay=()=>0,copied='',blob,navigated,networkListener;
 const preferences=new Map();
 class Worker{constructor(){this.call=engine();}postMessage(m){let data;try{data={id:m.id,ok:true,result:this.call(m.cmd,m)};}catch(e){data={id:m.id,ok:false,error:e.message};}setTimeout(()=>this.onmessage?.({data}),delay(m));}}
-const ctx=vm.createContext({localStorage:{getItem:k=>preferences.get(k)??null,setItem:(k,v)=>preferences.set(k,v)},URLSearchParams,document,Worker,setTimeout,clearTimeout,TextDecoder,Uint8Array,atob,crypto:require('node:crypto').webcrypto,Blob,URL:class extends URL{static createObjectURL(b){blob=b;return 'blob:test';}static revokeObjectURL(){}},navigator:{clipboard:{writeText:async t=>{copied=t;}}},chrome:{runtime:{},devtools:{network:{onRequestFinished:{addListener(){}},onNavigated:{addListener(fn){navigated=fn;}},getHAR:fn=>fn({entries:[]})}}},console});ctx.window=ctx;
+const ctx=vm.createContext({localStorage:{getItem:k=>preferences.get(k)??null,setItem:(k,v)=>preferences.set(k,v)},URLSearchParams,document,Worker,setTimeout,clearTimeout,TextDecoder,Uint8Array,atob,crypto:require('node:crypto').webcrypto,Blob,URL:class extends URL{static createObjectURL(b){blob=b;return 'blob:test';}static revokeObjectURL(){}},navigator:{clipboard:{writeText:async t=>{copied=t;}}},chrome:{runtime:{},devtools:{network:{onRequestFinished:{addListener(fn){networkListener=fn;}},onNavigated:{addListener(fn){navigated=fn;}},getHAR:fn=>fn({entries:[]})}}},console});ctx.window=ctx;
 vm.runInContext(fs.readFileSync(path.join(base,'json-codec.js'),'utf8'),ctx);
 vm.runInContext(fs.readFileSync(path.join(base,'panel.js'),'utf8'),ctx);
 vm.runInContext(fs.readFileSync(path.join(base,'table-ui.js'),'utf8'),ctx);
@@ -59,12 +99,18 @@ ctx.TextEncoder=TextEncoder;
 get('#responseEditor').classList.add('hidden');
 vm.runInContext(fs.readFileSync(path.join(base,'response-editor.js'),'utf8'),ctx);
 const run=x=>vm.runInContext(x,ctx),req={request:{url:'https://test/api',method:'GET'},response:{status:200},time:1};ctx.fixture=req;
+await test('network capture starts without changing views and receives localhost JSON',async()=>{
+  await new Promise(resolve=>setTimeout(resolve,10));assert.equal(typeof networkListener,'function');
+  networkListener({request:{url:'http://localhost/api/boot',method:'GET'},response:{status:200,headers:[{name:'Content-Type',value:'application/json'}]},getContent:done=>done('{"local":true}','')});
+  await new Promise(resolve=>setTimeout(resolve,20));assert.equal(run('requests.some(r=>r.url==="http://localhost/api/boot")'),true);
+  run('requests=[]');
+});
 await test('panel root table renders header and primitive values',async()=>{await run('addRequest(fixture,"[1,2,3]")');await run('selectRequest(requests[0])');assert(get('#tree').children[0].children[0].children.some(e=>e.textContent.includes('表格')));await run('openTable([])');assert.equal(get('#dataTable thead').children[0].children.length,2);assert.equal(get('#dataTable tbody').children.length,3);});
 await test('switch clears old table; stale results cannot overwrite',async()=>{delay=m=>m.cmd==='table'?30:0;const rendering=run('renderTable()');await run('addRequest(fixture,"{\\"new\\":true}")');await run('selectRequest(requests[0])');await rendering;assert.equal(get('#dataTable tbody').children.length,0);assert.equal(run('tableState.path'),null);delay=()=>0;});
 await test('nested modal reads own path and ignores stale responses',async()=>{await run('showValue(["new"],"new")');assert(get('#modalContent').children.find(e=>e.className==='viewer-scalar').textContent.startsWith('true'));delay=m=>m.cmd==='viewerDocument'?30:0;const showing=run('showValue(["new"],"new")');run('resetDetail()');await showing;assert(get('#modal').classList.contains('hidden'));delay=()=>0;});
 await test('Markdown and CSV export all rows and neutralize formulas',async()=>{ctx.raw=JSON.stringify(Array.from({length:250},(_,i)=>({n:i,text:i===0?'=1+1':'row'})));await run('addRequest(fixture,raw)');await run('selectRequest(requests[0])');await run('openTable([])');await run('toMarkdown()');assert.equal(copied.trim().split('\n').length,252);await run('toCSV()');const text=await blob.text();assert.equal(text.trim().split('\n').length,251);assert(text.includes("'=1+1"));});
 await test('highlight treats markup as text, supports literal punctuation',()=>{ctx.hitElement=new El();run('highlightText(hitElement,"<img src=x> a.b A.B", "a.b")');assert.equal(ctx.hitElement.children.filter(e=>e.textContent.toLowerCase()==='a.b').length,2);assert(ctx.hitElement.children.some(e=>e.textContent.includes('<img src=x>')));});
-await test('clicking abbreviated text opens only the selected field',async()=>{ctx.raw=JSON.stringify([{long:'Very long field '.repeat(30),other:'DO_NOT_INCLUDE'}]);await run('addRequest(fixture,raw)');await run('selectRequest(requests[0])');await run('openTable([])');const span=get('#dataTable tbody').children[0].children[0].children[0].children[0];assert.equal(span.role,'button');await span.onclick({stopPropagation(){}});assert(get('#modalContent').textContent.includes('Very long field'));assert(!get('#modalContent').textContent.includes('DO_NOT_INCLUDE'));});
+await test('explicit view opens only the selected field; values do not open on click',async()=>{ctx.raw=JSON.stringify([{long:'Very long field '.repeat(30),other:'DO_NOT_INCLUDE'}]);await run('addRequest(fixture,raw)');await run('selectRequest(requests[0])');await run('openTable([])');const span=get('#dataTable tbody').children[0].children[0].children[0].children[0];assert.equal(typeof span.onclick,'function');const actions=get('#dataTable tbody').children[0].children[0].children[0].children;assert(!actions.some(e=>e.textContent==='复制'));await span.onclick({stopPropagation(){}});assert.equal(copied,'Very long field '.repeat(30));await actions.find(e=>e.textContent==='查看').onclick({stopPropagation(){}});assert(get('#modalContent').textContent.includes('Very long field'));assert(!get('#modalContent').textContent.includes('DO_NOT_INCLUDE'));});
 await test('search scrolls to focused cell and next match changes target',async()=>{ctx.raw=JSON.stringify([{a:'no',b:'needle',c:'needle'}]);await run('addRequest(fixture,raw)');await run('selectRequest(requests[0])');await run('openTable([])');run('tableState.query="needle";tableState.hitIndex=0');await run('renderTable(true)');const cells=get('#dataTable tbody').children[0].children;assert(cells[1].scrolled);assert.equal(get('#matchPosition').textContent,'1 / 2');await run('stepMatch(1)');assert.equal(get('#matchPosition').textContent,'2 / 2');assert(get('#dataTable tbody').children[0].children[2].scrolled);});
 await test('integrated viewer renders lazy tree and searches to a field',async()=>{ctx.raw=JSON.stringify({items:[{name:'ordinary'},{name:'wanted'}]});await run('addRequest(fixture,raw)');await run('selectRequest(requests[0])');await run('showValue([],"JSON")');assert(!get('#viewerToolbar').classList.contains('hidden'));assert(get('#modalContent').textContent.includes('items'));get('#viewerQuery').value='wanted';await run('searchViewer()');assert(get('#viewerPath').textContent.endsWith('items[1].name'));assert.deepEqual(Array.from(run('viewerState.path')),[]);assert(run('viewerState.focusRow.scrolled')); assert(get('#modalContent').textContent.includes('wanted'));await run('navigateViewer(viewerState.home)');assert.equal(get('#viewerPath').textContent,'root');});
 ctx.localStorage={getItem:k=>preferences.get(k)??null,setItem:(k,v)=>preferences.set(k,v)};ctx.addEventListener=()=>{};
@@ -136,6 +182,78 @@ await test('column drag adjusts only width and does not sort the table',async()=
 await test('viewer accepts a replacement query while the previous search is pending',async()=>{ctx.raw='{"a":"alpha","b":"beta"}';await run('addRequest(fixture,raw)');await run('selectRequest(requests[0])');await run('showValue([],"JSON")');delay=m=>m.cmd==='viewerSearch' && m.query==='alpha'?30:0;get('#viewerQuery').value='alpha';const first=run('searchViewer()');get('#viewerQuery').value='beta';await run('searchViewer()');await first;assert.equal(run('viewerState.query'),'beta');assert.equal(run('viewerState.searchMatches[0].label'),'beta');assert.equal(run('viewerState.searchBusy'),false);delay=()=>0;});
 await test('primitive tree rows show their type and value without duplication',()=>{ctx.leafHost=new El();run('renderChildren([{key:"code",path:["code"],type:"number",label:"200",preview:"200"}],leafHost)');const html=ctx.leafHost.children[0].children[0].innerHTML;assert(html.includes('>number</span>'));assert.equal((html.match(/200/g)||[]).length,1);});
 await test('large viewer displays the final array item through a bounded DOM window',async()=>{ctx.raw=JSON.stringify(Array.from({length:6000},(_,i)=>i));await run('addRequest(fixture,raw)');await run('selectRequest(requests[0])');await run('showValue([],"JSON")');await get('#modalContent').children[1].onclick({stopPropagation(){}});assert(run('viewerState.expansion.done'));assert.equal(run('viewerState.expansion.total'),6001);assert(run('viewerState.expansion.root.children.length')<200);get('#modalContent').scrollTop=5990*32;await get('#modalContent').onscroll();assert(get('#modalContent').textContent.includes('5999'));assert(get('#viewerExpansionText').textContent.includes('已全部展开'));run('closeModal()');assert.equal(get('#modalContent').onscroll,null);});
+await test('fully expanded virtual rows support click and keyboard folding without disturbing sibling actions',async()=>{
+  ctx.raw=JSON.stringify({rows:[{id:1,profile:{name:'first'},status:'ready'},{id:2,profile:{name:'second'},status:'ready'}],padding:Array.from({length:5100},(_,i)=>i)});
+  await run('addRequest(fixture,raw)');await run('selectRequest(requests[0])');await run('showValue([],"JSON")');await get('#modalContent').children[1].onclick({stopPropagation(){}});
+  const row=title=>run('viewerState.expansion.root').children.find(element=>element.children[1]?.title===title),total=run('viewerState.expansion.total');
+  let inner=row('root.rows[0].profile');assert.equal(inner['aria-expanded'],'true');await inner.onclick();assert.equal(run('viewerState.expansion.total'),total-1);assert.equal(row('root.rows[0].profile')['aria-expanded'],'false');
+  await row('root.rows[0]').onclick();assert(!row('root.rows[0].profile'));assert(row('root.rows[1]'));
+  await row('root.rows[0]').onclick();inner=row('root.rows[0].profile');assert.equal(inner['aria-expanded'],'false');
+  await inner.onkeydown({target:inner,key:'ArrowRight',preventDefault(){}});assert.equal(run('viewerState.expansion.total'),total);
+  const sibling=row('root.rows[1]'),before=run('viewerState.expansion.total');let stopped=false;await sibling.children.find(el=>el.textContent==='复制').onclick({stopPropagation(){stopped=true;}});assert(JSON.parse(copied).profile.name==='second');assert(stopped);assert.equal(run('viewerState.expansion.total'),before);
+  inner=row('root.rows[0].profile');await inner.onkeydown({target:inner,key:' ',preventDefault(){}});assert.equal(row('root.rows[0].profile')['aria-expanded'],'false');
+  get('#modalContent').scrollTop=(run('viewerState.expansion.total')-10)*32;await get('#modalContent').onscroll();assert(get('#modalContent').textContent.includes('5099'));assert(run('viewerState.expansion.root.children.length')<200);
+  get('#modalContent').scrollTop=0;await get('#modalContent').onscroll();
+  await row('root').onclick();assert.equal(run('viewerState.expansion.total'),1);assert.equal(get('#viewerCollapse').textContent,'展开全部');
+  await get('#viewerCollapse').onclick();assert.equal(run('viewerState.expansion.total'),total);assert.equal(get('#viewerCollapse').textContent,'收起全部');assert(run('viewerState.expansion.root.children.length')<200);run('closeModal()');
+});
+await test('object and array labels do not copy and their rows still toggle',async()=>{
+ ctx.raw='{"items":[{"name":"value"}]}';await run('addRequest(fixture,raw)');await run('selectRequest(requests[0])');await run('showValue([],"JSON")');
+ const root=get('#modalContent').children[0].children[0],array=root.children[1].children[0];
+ for(const branch of [root,array]){
+  const row=branch.children[0],label=row.children.find(el=>el.className?.startsWith('viewer-value'));
+  assert.equal(label.onclick,undefined);const before=copied;
+  const wasHidden=branch.children[1].classList.contains('hidden');await row.onclick();assert.notEqual(branch.children[1].classList.contains('hidden'),wasHidden);assert.equal(copied,before);
+  await row.onclick();assert.equal(branch.children[1].classList.contains('hidden'),wasHidden);
+  const copy=row.children.find(el=>el.className==='mini-btn complex-copy');assert(copy);let stopped=false;
+  const state=branch.children[1].classList.contains('hidden');await copy.onclick({stopPropagation(){stopped=true;}});assert(stopped);assert.equal(branch.children[1].classList.contains('hidden'),state);assert.doesNotThrow(()=>JSON.parse(copied));
+ }
+ run('closeModal()');
+});
+await test('array symbols in the main data tree expand all items inline and isolate sibling scopes',async()=>{
+  ctx.raw=JSON.stringify({first:[{nested:[{value:1}]}],second:[{value:2}]});await run('addRequest(fixture,raw)');await run('selectRequest(requests[0])');
+  await get('#tree').children[0].children[0].onclick();
+  const branches=get('#tree').children[0].children[1].children,first=branches[0],second=branches[1];
+  const symbol=branch=>branch.children[0].children.find(el=>el.className==='mini-btn array-bulk-toggle');
+  const a=symbol(first),b=symbol(second);assert(a&&b);await first.children[0].onclick();assert(!first.children[1].classList.contains('hidden'));assert.equal(a.textContent,'⊞');let stopped=false;await a.onclick({stopPropagation(){stopped=true;}});assert(stopped);assert.equal(a.textContent,'⊟');assert.equal(run('inlineArrayScopes.size'),1);
+  const scope=run('[...inlineArrayScopes][0]');assert(scope.expansion.root.textContent.includes('value'));assert(scope.expansion.root.children.length<200);assert(!scope.expansion.root.children.some(el=>el.children[1]?.title==='root.first'));assert(scope.expansion.root.children.some(el=>el.children[1]?.title==='root.first[0]')); 
+  await b.onclick({stopPropagation(){}});assert.equal(run('inlineArrayScopes.size'),2);assert(scope.expansion.root.textContent.includes('nested'));
+  await a.onclick({stopPropagation(){}});assert(!first.children[1].classList.contains('hidden'));assert.equal(a.textContent,'⊞');assert.equal(run('inlineArrayScopes.size'),1);assert(!second.children[1].classList.contains('hidden'));
+  run('resetDetail()');assert.equal(run('inlineArrayScopes.size'),0);
+});
+await test('array symbols in the complete viewer preserve the parent location and neighboring branches',async()=>{
+  ctx.raw=JSON.stringify({first:[{nested:[{value:1}]}],second:[{value:2}]});await run('addRequest(fixture,raw)');await run('selectRequest(requests[0])');await run('showValue([],"JSON")');
+  const root=get('#modalContent').children[0].children[0],first=root.children[1].children[0],second=root.children[1].children[1];
+  const symbol=branch=>branch.children[0].children.find(el=>el.className==='mini-btn array-bulk-toggle');
+  const a=symbol(first);assert.equal(a.textContent,'⊞');await a.onclick({stopPropagation(){}});assert(!first.children[1].classList.contains('hidden'));assert.equal(a.textContent,'⊟');assert(run('[...inlineArrayScopes][0].expansion.root.textContent').includes('value'));await a.onclick({stopPropagation(){}});assert(!first.children[1].classList.contains('hidden'));assert(!second.children[1].classList.contains('hidden'));
+  await a.onclick({stopPropagation(){}});assert.equal(a.textContent,'⊟');assert.equal(run('inlineArrayScopes.size'),1);assert.equal(run('viewerState.path.length'),0);assert(!second.children[1].classList.contains('hidden'));
+  run('closeModal()');assert.equal(run('inlineArrayScopes.size'),0);
+});
+await test('array bulk symbols in the virtual viewer restore nested rows without reopening folded siblings',async()=>{
+  ctx.raw=JSON.stringify({first:[{nested:{value:1}}],second:[{value:2}],padding:Array.from({length:5100},(_,i)=>i)});await run('addRequest(fixture,raw)');await run('selectRequest(requests[0])');await run('showValue([],"JSON")');await get('#modalContent').children[1].onclick({stopPropagation(){}});
+  const row=title=>run('viewerState.expansion.root').children.find(element=>element.children[1]?.title===title),symbol=title=>row(title).children.find(el=>el.className==='mini-btn array-bulk-toggle');
+  await row('root.first[0].nested').onclick();await row('root.second').onclick();assert.equal(row('root.second')['aria-expanded'],'false');
+  await symbol('root.first').onclick({stopPropagation(){}});assert.equal(symbol('root.first').textContent,'⊟');assert(row('root.first[0].nested.value'));
+  await symbol('root.first').onclick({stopPropagation(){}});assert.equal(symbol('root.first').textContent,'⊞');
+  await symbol('root.first').onclick({stopPropagation(){}});assert(row('root.first[0].nested.value'));assert.equal(row('root.second')['aria-expanded'],'false');assert(run('viewerState.expansion.root.children.length')<200);run('closeModal()');
+});
+await test('inline expansions use the outer viewport geometry and keep a bounded DOM without a height cap',async()=>{
+ ctx.raw=JSON.stringify(Array.from({length:6000},(_,i)=>i));await run('addRequest(fixture,raw)');await run('selectRequest(requests[0])');
+ const button=get('#tree').children[0].children[0].children.find(el=>el.className==='mini-btn array-bulk-toggle');await button.onclick({stopPropagation(){}});
+ const scope=run('[...inlineArrayScopes][0]');assert.equal(scope.inlineHost.style.height,undefined);
+ const originalTarget=scope.expansion.scrollTarget,listener=scope.expansion.scrollListener;
+ assert(originalTarget.listeners.scroll.includes(listener));
+ let removed=false;scope.expansion.scrollTarget={clientHeight:480,getBoundingClientRect:()=>({top:0}),removeEventListener(){removed=true;}};
+ scope.inlineHost.getBoundingClientRect=()=>({top:-32000});ctx.scrollScope=scope;
+ await run('renderExpandedViewport(scrollScope,scrollScope.expansion)');
+ assert(scope.expansion.root.children.some(el=>el.children[1]?.title==='root[1000]'));assert(scope.expansion.root.children.length<100);
+ run('resetDetail()');assert(removed);
+});
+await test('switching requests during an inline array expansion releases the pending session',async()=>{
+  ctx.raw='[1,2,3]';await run('addRequest(fixture,raw)');await run('selectRequest(requests[0])');
+  const button=get('#tree').children[0].children[0].children.find(el=>el.className==='mini-btn array-bulk-toggle');
+  delay=m=>m.cmd==='viewerExpandStart'?30:0;const pending=button.onclick({stopPropagation(){}});run('resetDetail()');await pending;assert.equal(run('inlineArrayScopes.size'),0);delay=()=>0;
+});
 await test('one viewer button alternates collapse-all and expand-all',async()=>{ctx.raw='{"items":[{"nested":{"x":1}}]}';await run('addRequest(fixture,raw)');await run('selectRequest(requests[0])');await run('showValue([],"JSON")');assert.equal(get('#viewerCollapse').textContent,'收起全部');await get('#viewerCollapse').onclick();assert.equal(get('#viewerCollapse').textContent,'展开全部');assert.equal(get('#modalContent').children[0].children[0].children[0]['aria-expanded'],'false');await get('#viewerCollapse').onclick();assert.equal(get('#viewerCollapse').textContent,'收起全部');assert(run('viewerState.complete'));assert(!get('#modalContent').children[0].children[0].children[1].classList.contains('hidden'));});
 await test('expand-all toggle resumes the complete large-data view',async()=>{ctx.raw=JSON.stringify(Array.from({length:6000},(_,i)=>i));await run('addRequest(fixture,raw)');await run('selectRequest(requests[0])');await run('showValue([],"JSON")');assert.equal(get('#viewerCollapse').textContent,'展开全部');await get('#viewerCollapse').onclick();assert(run('viewerState.expansion.done'));await get('#viewerCollapse').onclick();assert.equal(get('#viewerCollapse').textContent,'展开全部');assert.equal(run('viewerState.expansion'),null);await get('#viewerCollapse').onclick();assert(run('viewerState.expansion.done'));assert.equal(run('viewerState.expansion.total'),6001);assert.equal(get('#viewerCollapse').textContent,'收起全部');});
 await test('large response integers export as numeric literals in JSON and CSV',async()=>{ctx.raw='[{"id":9007199254740993,"n":-12,"formula":"=1+1"}]';await run('addRequest(fixture,raw)');await run('selectRequest(requests[0])');await run('openTable([])');await get('#exportTableJson').onclick();const json=await blob.text();assert(json.includes('9007199254740993'));assert(!json.includes('"9007199254740993"'));await run('toCSV()');const csv=await blob.text();assert(csv.includes('"-12"'));assert(!csv.includes("'-12"));assert(csv.includes("'=1+1"));});
@@ -170,7 +288,25 @@ await test('an empty HAR body does not suppress the finished request with the sa
   run('capture(finishedRetry)');await new Promise(resolve=>setTimeout(resolve,20));
   assert.equal(run('requests.filter(r=>r.url==="https://test/retry-distinct").length'),1);
 });
-await test('capture ignores HAR entries without content readers',()=>{ctx.unreadable={request:{url:'https://test/missing'},response:{}};assert.doesNotThrow(()=>run('capture(unreadable)'));});
+await test('capture retries temporarily unreadable bodies without another network event',async()=>{
+  let reads=0;
+  ctx.delayedBody={request:{url:'https://test/delayed-body',method:'GET'},response:{status:200},getContent:done=>done(++reads===1?'':'{"ready":true}','')};
+  run('capture(delayedBody)');await new Promise(resolve=>setTimeout(resolve,400));
+  assert.equal(run('requests.filter(r=>r.url==="https://test/delayed-body").length'),1);
+  assert.equal(reads,2);
+});
+await test('clearing capture cancels pending response retries',async()=>{
+  let reads=0;
+  ctx.cancelledBody={request:{url:'https://test/cancelled-body',method:'GET'},response:{status:200},getContent:done=>{reads++;done('','');}};
+  run('capture(cancelledBody);captureGeneration++');await new Promise(resolve=>setTimeout(resolve,400));assert.equal(reads,1);
+});
+await test('localhost HAR inline JSON and BOM responses are captured',async()=>{
+ ctx.localHar={request:{url:'http://localhost:5173/api/inline',method:'GET'},response:{status:200,content:{mimeType:'application/json',text:'{"inline":true}'}}};
+ ctx.localBom={request:{url:'http://localhost/api/bom',method:'GET'},response:{status:200},getContent:done=>done('\uFEFF{"bom":true}','')};
+ run('capture(localHar);capture(localBom)');await new Promise(resolve=>setTimeout(resolve,20));
+ assert(run('requests.some(r=>r.url==="http://localhost:5173/api/inline")'));assert(run('requests.some(r=>r.url==="http://localhost/api/bom")'));
+});
+await test('capture reports HAR entries without content readers safely',()=>{ctx.unreadable={request:{url:'https://test/missing'},response:{}};assert.doesNotThrow(()=>run('capture(unreadable)'));});
 await test('expanded viewport resizes and releases its observer on close',async()=>{let observer;ctx.ResizeObserver=class{constructor(fn){this.callback=fn;observer=this;}observe(el){this.target=el;}disconnect(){this.disconnected=true;}};ctx.raw=JSON.stringify(Array.from({length:6000},(_,i)=>i));await run('addRequest(fixture,raw)');await run('selectRequest(requests[0])');await run('showValue([],"JSON")');await run('expandWholeViewer([])');const before=run('viewerState.expansion.root.children.length');get('#modalContent').clientHeight=1200;await observer.callback();assert(run('viewerState.expansion.root.children.length')>before);run('closeModal()');assert(observer.disconnected);delete ctx.ResizeObserver;});
 await test('navigation respects the preserve-log setting',async()=>{const count=run('requests.length');await navigated();assert.equal(run('requests.length'),count);get('#preserveLog').checked=false;get('#preserveLog').onchange();await navigated();assert.equal(run('requests.length'),0);assert.equal(run('selected'),null);assert.equal(JSON.parse(preferences.get('api-table-viewer.dev.v1')).preserveLog,false);});
 await test('clear releases retained records and resets state',async()=>{await get('#clearBtn').onclick();assert.equal(run('requests.length'),0);assert.equal(run('selected'),null);assert.equal(run('pending.size'),0);});

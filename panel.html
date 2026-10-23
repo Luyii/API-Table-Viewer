@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>API Table Viewer</title>
 <link rel="stylesheet" href="style.css">
+<script src="capture-status.js"></script>
 <script src="appearance.js"></script>
 </head>
 <body>
@@ -41,6 +42,8 @@
 
   <div id="fieldMockBar" class="field-mock-bar hidden"><div class="field-mock-heading"><span id="fieldMockSummary" role="status" aria-live="polite"></span><button id="fieldMockExit" class="btn">退出编辑</button></div><details><summary>查看修改</summary><div id="fieldMockChangeList"></div></details><span class="hint">网页重新请求时应用修改；真实后端仍会执行请求。</span></div>
 
+  <div id="captureStatus" class="capture-status" role="status">捕获诊断 D2 · 正在启动接口监听…</div>
+
   <div class="workspace">
     <aside id="requestSidebar" class="sidebar">
       <div class="side-title"><span>Network 接口</span><span id="requestCount" class="count">0</span><button id="closeSidebar" class="icon-btn" aria-label="收起接口列表" title="收起接口列表">×</button></div>
@@ -71,6 +74,7 @@
       </div>
 
       <section id="detail" class="detail hidden">
+        <button id="toggleDetailControls" class="detail-collapse-strip" type="button" aria-label="收起上方工具区" title="收起上方工具区" aria-expanded="true"><span aria-hidden="true"></span></button>
         <div class="request-head">
           <div class="request-info">
             <span id="methodBadge" class="method">GET</span>

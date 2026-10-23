@@ -12,6 +12,10 @@ function focusActiveSearch(){
   const scope=activeSearchScope();if(!scope)return;
   const input=$(scope==='viewer'?'#viewerQuery':scope==='table'?'#tableSearch':scope==='tree'?'#treeSearch':'#searchInput');
   if(scope==='requests' && typeof setSidebarCollapsed==='function' && sidebarLayout.collapsed)setSidebarCollapsed(false);
+  if((scope==='table'||scope==='tree') && $('#detail').classList.contains('detail-controls-collapsed')){
+    document.querySelectorAll('.floating-search-toolbar').forEach(el=>el.classList.remove('floating-search-toolbar'));
+    input.closest(scope==='table'?'.table-toolbar':'.subtoolbar')?.classList.add('floating-search-toolbar');
+  }
   input.focus();input.select();return scope;
 }
 async function nextSearchMatch(delta){
@@ -26,6 +30,7 @@ async function nextSearchMatch(delta){
   if(scope==='requests')focusActiveSearch();
 }
 async function handleSearchShortcut(e){
+  if(e.key==='Escape')document.querySelectorAll('.floating-search-toolbar').forEach(el=>el.classList.remove('floating-search-toolbar'));
   if(e.defaultPrevented || e.isComposing || e.altKey)return;
   const key=e.key.toLowerCase(),command=e.ctrlKey||e.metaKey;
   if(command && key==='f' && !e.shiftKey){
