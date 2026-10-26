@@ -403,3 +403,14 @@ mark,.table-wrap mark{background:var(--match);color:var(--match-text)}
 .cell-content>.complex-copy,.cell-content>.expand-cell{flex-shrink:0}
 
 .array-inline-viewport>.viewer-virtual{overflow-anchor:none}
+
+/* One theme color generates the complete palette. */
+.appearance-color-help{margin:7px 0 0;color:var(--muted);font-size:11px;line-height:1.6}
+.appearance-hex{width:92px;min-width:0;padding:5px 7px;border:1px solid var(--line);border-radius:4px;background:var(--control);color:var(--text);font:12px/1.5 ui-monospace,Consolas,monospace}
+.appearance-hex[aria-invalid=true]{border-color:var(--red)}
+.appearance-theme-input{display:flex;align-items:center;gap:8px}
+.appearance-theme-input>input[type=color]{width:28px;height:28px;padding:0;border:1px solid var(--line);border-radius:4px;background:transparent;cursor:pointer}
+.node-head>.node-key{color:var(--key)}
+.node-head>.node-type.type-null+.node-preview{color:var(--null)}
+
+.appearance-custom-theme{margin-top:12px}

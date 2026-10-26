@@ -16,12 +16,15 @@
     <details id="appearanceMenu" class="appearance-menu">
       <summary id="appearanceToggle" class="btn ghost appearance-toggle" aria-controls="appearancePanel" title="配色、字体与显示密度"><span aria-hidden="true">◐</span> 外观设置</summary>
       <div id="appearancePanel" class="appearance-panel" aria-label="外观设置">
-        <div class="appearance-heading"><div><strong>让界面更顺眼</strong><p>即时生效，自动记住你的选择</p></div><button id="appearanceClose" class="icon-btn" aria-label="关闭外观设置">×</button></div>
+        <div class="appearance-heading"><div><strong>外观设置</strong><p>即时生效，自动记住你的选择</p></div><button id="appearanceClose" class="icon-btn" aria-label="关闭外观设置">×</button></div>
         <fieldset><legend>整体配色</legend><div class="appearance-palettes">
           <button class="appearance-palette palette-graphite" data-theme-choice="graphite" aria-pressed="true"><span class="palette-preview" aria-hidden="true"><i></i><i></i><i></i></span>石墨紫</button>
           <button class="appearance-palette palette-ocean" data-theme-choice="ocean" aria-pressed="false"><span class="palette-preview" aria-hidden="true"><i></i><i></i><i></i></span>深海蓝</button>
           <button class="appearance-palette palette-forest" data-theme-choice="forest" aria-pressed="false"><span class="palette-preview" aria-hidden="true"><i></i><i></i><i></i></span>松林绿</button>
           <button class="appearance-palette palette-paper" data-theme-choice="paper" aria-pressed="false"><span class="palette-preview" aria-hidden="true"><i></i><i></i><i></i></span>暖白</button>
+        </div><div class="appearance-custom-theme">
+          <div class="appearance-theme-input"><label for="appearanceThemeHex">自定义</label><input id="appearanceThemeHex" class="appearance-hex" type="text" value="#181a20" placeholder="#e2e9df" maxlength="7" spellcheck="false" autocomplete="off" aria-describedby="appearanceThemeHelp appearanceStatus"><input id="appearanceThemeColor" type="color" value="#181a20" aria-label="自定义主题取色器"></div>
+          <p id="appearanceThemeHelp" class="appearance-color-help">输入一个颜色，自动生成整套配色。</p>
         </div></fieldset>
         <fieldset><legend>强调色</legend><div class="appearance-accents">
           <button class="accent-choice accent-violet" data-accent-choice="#8b9dff" aria-label="鸢尾紫" aria-pressed="true"></button>
@@ -31,6 +34,7 @@
           <button class="accent-choice accent-rose" data-accent-choice="#ed87a8" aria-label="玫瑰粉" aria-pressed="false"></button>
           <label class="appearance-custom" for="appearanceAccent">自选 <input id="appearanceAccent" type="color" value="#8b9dff" aria-label="自定义强调色"></label>
         </div><span id="appearanceAccentValue" class="appearance-color-value">#8B9DFF</span></fieldset>
+
         <div class="appearance-options"><label for="appearanceFont">数据字号<select id="appearanceFont"><option value="12">12 px</option><option value="13" selected>13 px</option><option value="14">14 px</option><option value="15">15 px</option><option value="16">16 px</option></select></label><label for="appearanceDensity">表格密度<select id="appearanceDensity"><option value="comfortable" selected>舒适</option><option value="compact">紧凑</option></select></label></div>
         <label class="appearance-check"><input id="appearanceStriped" type="checkbox" checked> 隔行底色，方便横向阅读</label>
         <div class="appearance-footer"><span id="appearanceStatus" role="status" aria-live="polite">设置仅影响当前扩展的外观</span><button id="appearanceReset" class="btn ghost">恢复默认</button></div>
