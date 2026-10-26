@@ -26,13 +26,14 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          fetch-depth: 0
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: ${{ matrix.node }}
           package-manager-cache: false
       # Tests use Node.js built-ins only; no npm install or lockfile is needed.
-      - name: Regression, extension resources and HTTP/Worker fixtures
-        run: npm test
+      - name: Test impacted modules
+        run: npm run test:changed -- --ci
 
   package:
     name: Extension ZIP
@@ -112,3 +113,4 @@ jobs:
           done
           gh release create v1.5.1 dist/API-Table-Viewer-v1.5.1.zip dist/SHA256SUMS.txt --target "$GITHUB_SHA" --title 'v1.5.1：查看器交互与请求捕获修复' --notes-file docs/RELEASE_v1.5.1.md --draft
           gh release edit v1.5.1 --draft=false --latest
+

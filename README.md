@@ -90,12 +90,13 @@ v1.5.1 包含独立数组扁平展开、一级内容恢复、主区域统一滚�
 开发检查需要 Node.js 18+ 和 Python 3，无需安装项目依赖。在仓库根目录执行：
 
 ```sh
-npm test
+npm run test:changed
+# 全量检查：npm test
 python3 scripts/package.py
 python3 tests/package-archive.py
 ```
 
-CI 使用 Node.js 18、22、24 执行检查，并验证扩展 ZIP。当前主回归为 103 项；完整检查范围、浏览器验收步骤和验证记录见 [测试与验证](docs/TESTING.md)。
+CI 使用 Node.js 18、22、24 执行检查，并验证扩展 ZIP。当前主回归为 103 项，另有 10 项捕获启动集成检查；完整检查范围、浏览器验收步骤和验证记录见 [测试与验证](docs/TESTING.md)。
 
 ## 文档与贡献
 
