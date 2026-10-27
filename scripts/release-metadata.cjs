@@ -1,0 +1,22 @@
+'use strict';
+// Only exact, explicit main-branch release commits may publish.
+const fs = require('node:fs'), assert = require('node:assert/strict');
+const p = require('../package.json'), m = require('../manifest.json');
+assert.match(p.version, /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/);
+assert.equal(m.version, p.version);
+assert.equal(p.license, 'UNLICENSED');
+assert.equal(p.private, true);
+const tag = 'v' + p.version;
+const event = JSON.parse(fs.readFileSync(process.env.GITHUB_EVENT_PATH, 'utf8'));
+assert.equal(process.env.GITHUB_EVENT_NAME, 'push');
+assert.equal(process.env.GITHUB_REF, 'refs/heads/main');
+assert.equal(event.head_commit.id, process.env.GITHUB_SHA);
+assert.equal(event.head_commit.message, 'release: publish ' + tag);
+const notes = 'docs/RELEASE_' + tag + '.md';
+const title = fs.readFileSync(notes, 'utf8').split('\n')[0].replace(/^# /, '');
+assert(title.startsWith(tag + '：'));
+assert(!/[\r\n]/.test(title));
+assert(fs.readFileSync('CHANGELOG.md', 'utf8').includes('## [' + p.version + '] - '));
+console.log('RELEASE_TAG=' + tag);
+console.log('RELEASE_TITLE=' + title);
+console.log('RELEASE_NOTES=' + notes);

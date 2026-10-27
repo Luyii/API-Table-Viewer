@@ -81,7 +81,7 @@ npm test
 1. Node.js 18、22、24 分别运行 `npm run test:changed -- --ci`；按改动选择测试组，无法确定范围时回退 `npm test`。
 2. 测试全部通过后，使用 Node.js 24 和 Python 3.12 打包并验证 ZIP。
 3. 测试和打包任务仅申请仓库读取权限，不安装项目依赖；验证通过后上传 ZIP Artifact，保留 30 天。
-4. 本次正式发布仅由 main 上提交消息精确为 `release: publish v1.5.1` 的推送触发；发布任务单独申请 contents: write，复验下载的 ZIP，拒绝覆盖已有标签或 Release。先上传草稿附件，再公开发布。
+4. 正式发布仅由 main 上提交消息精确为 `release: publish v<package.json 版本>` 的推送触发；发布任务单独申请 contents: write，复验下载的 ZIP，拒绝覆盖已有标签或 Release。先上传草稿附件，再公开发布。
 5. 任一命令失败会使对应任务失败；并发取消和超时规则以工作流文件为准。
 
 检查当前结果：[GitHub Actions](https://github.com/Luyii/API-Table-Viewer/actions/workflows/ci.yml)。
@@ -141,3 +141,7 @@ ZIP 验证包括文件白名单、重复条目、完整性、源码一致性和�
 - 本次没有执行真实 Chrome 扩展加载、DevTools 捕获、刷新后规则恢复或跨平台手工验收。沿用 fix8 用户验收记录，不能扩展为逐案例认证。
 - 发布任务以本次提交 SHA 为标签目标，附件来自该提交成功 CI 的构建产物；最终远端运行及附件状态以 Actions / Release 页面为准。
 
+
+## v1.5.2 发布验证
+
+完整范围和实机验收限制见 [v1.5.2 版本说明](RELEASE_v1.5.2.md#验证与限制)。发布时必须同步两个版本文件、CHANGELOG 和对应版本说明，无需修改工作流中的版本常量。全量测试、ZIP 检查成功后才允许发布；已有标签或 Release 一律拒绝覆盖。
