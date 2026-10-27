@@ -105,7 +105,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
         run: |
-          # Refuse duplicates; distinguish absence from authentication/network errors.
+          # Published releases and existing tags are immutable to this workflow.
           for endpoint in "releases/tags/$RELEASE_TAG" "git/ref/tags/$RELEASE_TAG"; do
             if gh api "repos/$GH_REPO/$endpoint" > /tmp/release-check.json 2> /tmp/release-check.err; then
               echo "Already exists: $endpoint; refusing to overwrite."
@@ -116,7 +116,29 @@ jobs:
             fi
           done
           test "$(gh api "repos/$GH_REPO/git/ref/heads/main" --jq .object.sha)" = "$GITHUB_SHA"
-          gh release create "$RELEASE_TAG" "dist/API-Table-Viewer-$RELEASE_TAG.zip" dist/SHA256SUMS.txt --target "$GITHUB_SHA" --title "$RELEASE_TITLE" --notes-file "$RELEASE_NOTES" --draft
+          # Drafts may exist after a failed upload/publish attempt. Resume only
+          # when all metadata and asset bytes match this fully tested build.
+          gh api --paginate "repos/$GH_REPO/releases" --jq '.[]' | jq -s --arg tag "$RELEASE_TAG" '[.[] | select(.tag_name == $tag)]' > /tmp/drafts.json
+          count=$(jq length /tmp/drafts.json)
+          if [ "$count" != 0 ]; then
+            test "$count" = 1
+            jq -e '.[0].draft == true and .[0].prerelease == false' /tmp/drafts.json
+            test "$(jq -r '.[0].name' /tmp/drafts.json)" = "$RELEASE_TITLE"
+            jq -r '.[0].body' /tmp/drafts.json > /tmp/draft-notes.md
+            diff -u <(sed -e '${/^$/d;}' "$RELEASE_NOTES") <(sed -e '${/^$/d;}' /tmp/draft-notes.md)
+            previous=$(jq -r '.[0].target_commitish' /tmp/drafts.json)
+            [[ "$previous" =~ ^[0-9a-f]{40}$ ]]
+            git merge-base --is-ancestor "$previous" "$GITHUB_SHA"
+            test "$(jq '.[0].assets | length' /tmp/drafts.json)" = 2
+            mkdir /tmp/release-assets
+            gh release download "$RELEASE_TAG" --dir /tmp/release-assets
+            cmp "dist/API-Table-Viewer-$RELEASE_TAG.zip" "/tmp/release-assets/API-Table-Viewer-$RELEASE_TAG.zip"
+            cmp dist/SHA256SUMS.txt /tmp/release-assets/SHA256SUMS.txt
+          else
+            gh release create "$RELEASE_TAG" "dist/API-Table-Viewer-$RELEASE_TAG.zip" dist/SHA256SUMS.txt --target "$GITHUB_SHA" --title "$RELEASE_TITLE" --notes-file "$RELEASE_NOTES" --draft
+          fi
+          # GitHub defers missing-tag creation for drafts. Create the ref
+          # explicitly so it can be verified before public publication.
+          gh api --method POST "repos/$GH_REPO/git/refs" -f ref="refs/tags/$RELEASE_TAG" -f sha="$GITHUB_SHA"
           test "$(gh api "repos/$GH_REPO/git/ref/tags/$RELEASE_TAG" --jq .object.sha)" = "$GITHUB_SHA"
-          gh release edit "$RELEASE_TAG" --draft=false --latest
-
+          gh release edit "$RELEASE_TAG" --target "$GITHUB_SHA" --draft=false --latest
