@@ -84,7 +84,7 @@ class El {
  querySelector(){return new El();}click(){return this.onclick?.({stopPropagation(){},target:this});}select(){}
 }
 const els=new Map(),get=s=>{if(!els.has(s))els.set(s,new El());return els.get(s);},buttons=[];
-const document={querySelector:get,querySelectorAll:s=>s==='.tab'?['tree','table','raw'].map(name=>{const e=get('tab-'+name);e.dataset.tab=name;return e;}):buttons,createElement:tag=>{const e=new El();if(tag==='button')buttons.push(e);return e;},createTextNode:t=>{const e=new El();e.textContent=t;return e;},body:new El(),addEventListener(){},execCommand:()=>true};
+const document={documentElement:new El(),querySelector:get,querySelectorAll:s=>s==='.tab'?['tree','table','raw'].map(name=>{const e=get('tab-'+name);e.dataset.tab=name;return e;}):buttons,createElement:tag=>{const e=new El();if(tag==='button')buttons.push(e);return e;},createTextNode:t=>{const e=new El();e.textContent=t;return e;},body:new El(),addEventListener(){},execCommand:()=>true};
 let delay=()=>0,copied='',blob,navigated,networkListener;
 const preferences=new Map();
 class Worker{constructor(){this.call=engine();}postMessage(m){let data;try{data={id:m.id,ok:true,result:this.call(m.cmd,m)};}catch(e){data={id:m.id,ok:false,error:e.message};}setTimeout(()=>this.onmessage?.({data}),delay(m));}}

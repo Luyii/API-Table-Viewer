@@ -3,7 +3,7 @@
 用于 JSON 接口分析与字段级响应模拟的 Chrome DevTools 扩展。
 
 [![CI](https://github.com/Luyii/API-Table-Viewer/actions/workflows/ci.yml/badge.svg)](https://github.com/Luyii/API-Table-Viewer/actions/workflows/ci.yml)
-![Version](https://img.shields.io/badge/version-1.5.2-2563eb)
+![Version](https://img.shields.io/badge/version-1.5.3-2563eb)
 ![Chrome](https://img.shields.io/badge/Chrome-114%2B-4285f4)
 ![Manifest](https://img.shields.io/badge/Manifest-V3-16a34a)
 ![Dependencies](https://img.shields.io/badge/runtime_dependencies-0-0f766e)
@@ -20,7 +20,8 @@ API Table Viewer 将 JSON 响应转换为可搜索的表格与数据树，并支
 
 | 版本 | 更新主题 | 详细说明 |
 | --- | --- | --- |
-| **v1.5.2** | 单色主题定制与测试工程改进 | [版本说明](docs/RELEASE_v1.5.2.md) |
+| **v1.5.3** | 数据显示转换与空值提示 | [版本说明](docs/RELEASE_v1.5.3.md) |
+| v1.5.2 | 单色主题定制与测试工程改进 | [版本说明](docs/RELEASE_v1.5.2.md) |
 | v1.5.1 | 查看器交互与请求捕获修复 | [版本说明](docs/RELEASE_v1.5.1.md) |
 | v1.5.0 | 字段级响应模拟 | [版本说明](docs/RELEASE_v1.5.0.md) |
 

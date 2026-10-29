@@ -49,6 +49,80 @@ function highlightText(el,text,query){
   }
   el.appendChild(document.createTextNode(text.slice(from)));
 }
+// Display-only formatting: original values remain in the worker and copy actions.
+const timestampSettingKey='api-table-viewer.timestamp-display.v1';
+let timestampDisplay=false;
+try{timestampDisplay=localStorage.getItem(timestampSettingKey)==='true';}catch{}
+function formatTimestamp(text,type){
+  if(type!=='number' && type!=='string')return null;
+  let raw=String(text);
+  if(type==='string' && raw.startsWith('"') && raw.endsWith('"')){
+    try{raw=JSON.parse(raw);}catch{return null;}
+  }
+  if(typeof raw!=='string' || !/^(?:\d{10}|\d{13})$/.test(raw))return null;
+  const ms=Number(raw)*(raw.length===10?1000:1);
+  if(ms<Date.UTC(2000,0,1) || ms>=Date.UTC(2101,0,1))return null;
+  const d=new Date(ms),pad=n=>String(n).padStart(2,'0');
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}${raw.length===13 && d.getMilliseconds()?'.'+String(d.getMilliseconds()).padStart(3,'0'):''}`;
+}
+function timestampValue(el,text,type,query=''){
+  markEmpty(el,type,text);
+  const formatted=formatTimestamp(text,type);
+  if(!formatted){highlightText(el,text,query);return;}
+  el.dataset.timestampOriginal=String(text);el.dataset.timestampFormatted=formatted;el.dataset.timestampQuery=query;
+  highlightText(el,timestampDisplay?formatted:text,query);
+  el.title='原始值：'+text;
+}
+const displayMenu=$('#displayMenu'),displayToggle=$('#displayToggle');
+function closeDisplayMenu(){displayMenu.open=false;displayToggle.focus();}
+$('#displayClose').onclick=closeDisplayMenu;
+document.addEventListener('pointerdown',event=>{if(displayMenu.open && !displayMenu.contains(event.target))displayMenu.open=false;});
+document.addEventListener('keydown',event=>{if(event.key==='Escape' && displayMenu.open){event.preventDefault();event.stopPropagation();closeDisplayMenu();}},true);
+// Display preferences affect only rendered controls; worker records stay untouched.
+for(const [id,key,attribute] of [['jsonStringDisplay','api-table-viewer.json-string-display.v1','jsonStrings'],['emptyDisplay','api-table-viewer.empty-display.v1','emptyValues']]){
+  const input=$('#'+id);try{input.checked=localStorage.getItem(key)==='true';}catch{}
+  const apply=()=>{document.documentElement.dataset[attribute]=input.checked?'on':'off';};apply();
+  input.onchange=()=>{apply();try{localStorage.setItem(key,String(input.checked));}catch{}};
+}
+function markEmpty(el,type,text){
+  const empty=type==='null'?'null':type==='string' && (text==='' || text==='""')?'string':type==='array' && text==='Array(0)'?'array':type==='object' && /^Object · 0 /.test(text)?'object':'';
+  if(empty){el.dataset.emptyValue=empty;el.title=(el.title?el.title+'\n':'')+({null:'空值 null',string:'空字符串',array:'空数组',object:'空对象'})[empty];}
+}
+function jsonStringButton(kind,rid,path){
+  if(!kind || !rid || !path)return null;
+  const button=document.createElement('button');button.className='mini-btn json-string-button';button.textContent='JSON 字符串';button.title='展开原始字符串解析出的结构';
+  button.onclick=safe(async event=>{
+    event.stopPropagation();const result=await callWorker('valueText',{rid,path});
+    const parsed=JSON.parse(result.text);if(!parsed || typeof parsed!=='object')throw Error('不是 JSON 对象或数组');
+    const host=button.parentElement;let details=host.querySelector(':scope > .json-string-structure');
+    if(details){details.remove();return;}
+    details=document.createElement('div');details.className='json-string-structure';
+    const root=document.createElement('details');root.open=true;const summary=document.createElement('summary');summary.textContent='JSON 字符串 · '+(Array.isArray(parsed)?`Array(${parsed.length})`:`Object · ${Object.keys(parsed).length} 个字段`);root.appendChild(summary);
+    function children(value,container){
+      const keys=Object.keys(value);let offset=0;
+      function next(){const shown=keys.slice(offset,offset+200);offset+=shown.length;
+      for(const key of shown){const item=value[key];
+        const row=document.createElement('div');row.className='json-string-entry';
+        if(item && typeof item==='object'){
+          const node=document.createElement('details'),label=document.createElement('summary');label.textContent=key+': '+(Array.isArray(item)?`Array(${item.length})`:`Object · ${Object.keys(item).length} 个字段`);markEmpty(label,Array.isArray(item)?'array':'object',Array.isArray(item)?`Array(${item.length})`:`Object · ${Object.keys(item).length} 个字段`);node.appendChild(label);
+          node.ontoggle=()=>{if(node.open && !node.dataset.loaded){node.dataset.loaded='1';children(item,node);}};row.appendChild(node);
+        }else{const label=document.createElement('span');label.textContent=key+': ';row.appendChild(label);const value=document.createElement('span');timestampValue(value,typeof item==='string'?JSON.stringify(item):String(item),item===null?'null':typeof item);row.appendChild(value);}
+        container.appendChild(row);
+      }
+      if(offset<keys.length){const more=document.createElement('button');more.className='mini-btn';more.textContent=`加载更多（剩余 ${keys.length-offset} 项）`;more.onclick=()=>{more.remove();next();};container.appendChild(more);}}
+      next();
+    }
+    children(parsed,root);details.appendChild(root);host.appendChild(details);
+  });return button;
+}
+function addJsonStringButton(host,kind,rid,path){const button=jsonStringButton(kind,rid,path);if(button)host.appendChild(button);}
+const timestampToggle=$('#timestampDisplay');
+timestampToggle.checked=timestampDisplay;
+timestampToggle.onchange=()=>{
+  timestampDisplay=timestampToggle.checked;
+  try{localStorage.setItem(timestampSettingKey,String(timestampDisplay));}catch{}
+  document.querySelectorAll('[data-timestamp-original]').forEach(el=>highlightText(el,timestampDisplay?el.dataset.timestampFormatted:el.dataset.timestampOriginal,el.dataset.timestampQuery));
+};
 function pathText(path) {
   return "root"+path.map(p=>Number.isInteger(p)?`[${p}]`:/^[A-Za-z_$][\w$]*$/.test(p)?`.${p}`:`[${stringifyJson(p)}]`).join("");
 }
@@ -140,10 +214,11 @@ function renderNode(meta,parent,root=false,path=[]) {
   const expandable=["object","array"].includes(meta.type);
   head.innerHTML=`<span class="caret ${expandable?"":"leaf"}">${expandable?"▶":""}</span><span class="node-key">${root?"root":esc(path[path.length-1])}</span><span class="node-type ${typeClass(meta.type)}">${esc(expandable?meta.label:meta.type)}</span>${!expandable?`<span class="node-preview">${esc(meta.label)}</span>`:""}`;
   const bulk=meta.type==="array"?arrayBulkButton():null;if(bulk)head.appendChild(bulk);
-  if(expandable)head.appendChild(complexCopyButton(selected.rid,path));
+  if(expandable){markEmpty(head.querySelector('.node-type'),meta.type,meta.label);head.appendChild(complexCopyButton(selected.rid,path));}
+  else addJsonStringButton(head,meta.jsonString,selected.rid,path);
   if(meta.type==="array") {const b=document.createElement("button");b.className="mini-btn";b.textContent="▦ 表格";b.onclick=safe(e=>{e.stopPropagation();return openTable(path);});head.appendChild(b);}
   if(root){const b=document.createElement("button");b.className="mini-btn";b.textContent="查看";b.onclick=safe(e=>{e.stopPropagation();return showValue(path,"root");});head.appendChild(b);}
-  if(!expandable)bindValueCopy(head.querySelector('.node-preview'),selected.rid,path);
+  if(!expandable){timestampValue(head.querySelector('.node-preview'),meta.label,meta.type);bindValueCopy(head.querySelector('.node-preview'),selected.rid,path);}
   if(!expandable && typeof FieldMock!=='undefined')FieldMock.bind(head.querySelector('.node-preview'),selected,path,meta.type,head);
   wrap.appendChild(head); parent.appendChild(wrap);
   const children=document.createElement("div"); children.className="node-children hidden"; wrap.appendChild(children);
@@ -178,7 +253,8 @@ function renderChildren(list,parent){
     const basePath=c.path;
     head.innerHTML=`<span class="caret ${expandable?"":"leaf"}">${expandable?"▶":""}</span><span class="node-key">${esc(key)}</span><span class="node-type ${typeClass(c.type)}">${esc(expandable?c.label:c.type)}</span>${!expandable?`<span class="node-preview">${esc(c.preview)}</span>`:""}`;
     const bulk=c.type==='array'?arrayBulkButton():null;if(bulk)head.appendChild(bulk);
-    if(expandable)head.appendChild(complexCopyButton(selected.rid,basePath));
+    if(expandable){markEmpty(head.querySelector('.node-type'),c.type,c.label);head.appendChild(complexCopyButton(selected.rid,basePath));}
+    else addJsonStringButton(head,c.jsonString,selected.rid,basePath);
     if(expandable) {
       const actions=document.createElement("span"); actions.className="node-actions";
       if(c.type==="array") {
@@ -187,7 +263,7 @@ function renderChildren(list,parent){
       const v=document.createElement("button"); v.className="mini-btn"; v.textContent="查看"; v.onclick=safe(e=>{e.stopPropagation();return showValue(basePath,key);}); actions.appendChild(v);
       head.appendChild(actions);
     }
-    if(!expandable)bindValueCopy(head.querySelector('.node-preview'),selected.rid,basePath);
+    if(!expandable){timestampValue(head.querySelector('.node-preview'),c.preview,c.type);bindValueCopy(head.querySelector('.node-preview'),selected.rid,basePath);}
     if(!expandable && typeof FieldMock!=='undefined')FieldMock.bind(head.querySelector('.node-preview'),selected,basePath,c.type,head);
     wrap.appendChild(head);
     const child=document.createElement("div"); child.className="node-children hidden"; wrap.appendChild(child);
@@ -259,7 +335,8 @@ async function renderTable(navigate=false){
         const text=cell.text,complex=cell.type==='object'||cell.type==='array';
         const content=document.createElement("div");content.className="cell-content";
         const span=document.createElement("span");span.className="cell-text"+(complex?" cell-complex":"");span.title=cell.type==="undefined"?"此行没有该字段":cell.type==="string"&&text===""?"空字符串":text;
-        highlightText(span,cell.type==="undefined"?"—":cell.type==="string"&&text===""?'""':text,tableState.query);content.appendChild(span);td.appendChild(content);
+        timestampValue(span,cell.type==="undefined"?"—":cell.type==="string"&&text===""?'""':text,cell.type,tableState.query);content.appendChild(span);td.appendChild(content);
+        addJsonStringButton(content,cell.jsonString,selected.rid,cell.path);
         if(cell.matched){const badge=document.createElement("span");badge.className="match-badge";badge.textContent="内部匹配";content.appendChild(badge);}
         if(cell.expand && cell.path){
           const b=document.createElement("button");b.className="expand-cell";b.textContent="查看";

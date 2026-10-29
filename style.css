@@ -414,3 +414,19 @@ mark,.table-wrap mark{background:var(--match);color:var(--match-text)}
 .node-head>.node-type.type-null+.node-preview{color:var(--null)}
 
 .appearance-custom-theme{margin-top:12px}
+
+/* Independent display conversions menu, next to appearance settings. */
+.display-menu{flex:none;position:relative}
+.display-menu[open]>.appearance-toggle{border-color:var(--blue);background:var(--selection)}
+.display-menu :is(button,summary,input):focus-visible{outline:2px solid var(--blue);outline-offset:3px}
+.display-panel .appearance-check{margin-bottom:6px}
+.display-help{margin:0 0 0 19px;color:var(--muted);font-size:11px;line-height:1.5}
+
+.display-panel .display-help{margin-bottom:12px}
+.json-string-button,.json-string-structure{display:none}
+:root[data-json-strings=on] .json-string-button{display:inline-flex}
+:root[data-json-strings=on] .json-string-structure{display:block}
+.json-string-structure{position:fixed;right:12px;top:60px;z-index:80;width:min(600px,calc(100vw - 24px));max-height:min(70vh,500px);overflow:auto;white-space:normal;padding:8px;border:1px solid var(--line);border-radius:6px;background:var(--panel);color:var(--text);font:12px/1.6 Consolas,monospace}
+.json-string-entry{padding-left:16px;overflow-wrap:anywhere}.json-string-structure summary{cursor:pointer}
+:root[data-empty-values=on] [data-empty-value]{outline:1px solid var(--blue);outline-offset:2px;border-radius:2px;background:var(--selection);font-weight:700}
+:root[data-empty-values=on] [data-empty-value=string]:empty::after{content:'空字符串';font-style:italic}

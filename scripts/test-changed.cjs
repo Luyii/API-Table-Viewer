@@ -7,6 +7,7 @@ const suites={
  capture:['node','--test','tests/capture-startup.cjs'],
  appearance:['node','--test','tests/appearance.cjs'],
  regression:['node','tests/regression.cjs'],
+ display:['node','tests/display-conversion.cjs'],
  fixtures:['node','--test','tests/manual/check.cjs'],
  fields:['node','--test','tests/field-mock.cjs'],
  mock:['node','--test','tests/response-mock.cjs'],
@@ -26,13 +27,13 @@ function select(files){
   if(file==='panel.html'){add(file,'resources','capture','appearance','preview');continue;}
   if(file==='capture-status.js'||file==='devtools.js'||file==='devtools.html'){add(file,'resources','capture');continue;}
   if(['panel.js','developer.js','viewer.js','viewer-expanded.js','layout.js','shortcuts.js','table-ui.js'].includes(file)){
-   add(file,'resources','capture','regression');if(file==='table-ui.js')add(file,'appearance');continue;
+   add(file,'resources','capture','regression');if(['panel.js','viewer.js','viewer-expanded.js'].includes(file))add(file,'display');if(file==='table-ui.js')add(file,'appearance');continue;
   }
-  if(['worker.js','json-codec.js','field-patch-core.js'].includes(file)){add(file,'resources','regression','capture','fixtures','fields');if(file==='field-patch-core.js')add(file,'mock');continue;}
+  if(['worker.js','json-codec.js','field-patch-core.js'].includes(file)){add(file,'resources','regression','capture','fixtures','fields');if(file==='worker.js')add(file,'display');if(file==='field-patch-core.js')add(file,'mock');continue;}
   if(file.startsWith('field-mock')&&file.endsWith('.js')){add(file,'resources','capture','fields');continue;}
   if(['response-editor.js','response-mock.js','mock-page.js'].includes(file)){add(file,'resources','capture','regression','mock');continue;}
   if(file==='scripts/package.py'||file==='tests/package-archive.py'){add(file,'resources');add(file,'archive');continue;}
-  const tests={'tests/regression.cjs':'regression','tests/capture-startup.cjs':'capture','tests/helpers/capture-panel.cjs':'capture','tests/appearance.cjs':'appearance','tests/field-mock.cjs':'fields','tests/response-mock.cjs':'mock','tests/package-check.cjs':'resources'};
+  const tests={'tests/display-conversion.cjs':'display','tests/regression.cjs':'regression','tests/capture-startup.cjs':'capture','tests/helpers/capture-panel.cjs':'capture','tests/appearance.cjs':'appearance','tests/field-mock.cjs':'fields','tests/response-mock.cjs':'mock','tests/package-check.cjs':'resources'};
   if(tests[file]){add(file,tests[file]);continue;}
   if(file.startsWith('tests/manual/')){add(file,'fixtures','mock');continue;}
   if(file.startsWith('tests/preview/')){add(file,'preview');continue;}

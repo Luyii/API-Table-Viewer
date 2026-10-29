@@ -68,7 +68,8 @@ async function renderExpandedViewport(s,e){
     }
     const arrow=document.createElement('span');arrow.className='flat-caret';arrow.textContent=expandable?(meta.expanded?'▾':'▸'):'·';row.appendChild(arrow);
     const key=document.createElement('span');key.className='viewer-key';highlightText(key,meta.path.length?String(meta.path.at(-1)):'root',s.query);key.title=pathText(meta.path);row.appendChild(key);
-    const value=document.createElement('span');value.className='viewer-value type-'+meta.type;highlightText(value,meta.label,s.query);value.title=meta.label;row.appendChild(value);
+    const value=document.createElement('span');value.className='viewer-value type-'+meta.type;timestampValue(value,meta.label,meta.type,s.query);if(!value.title)value.title=meta.label;row.appendChild(value);
+    addJsonStringButton(row,meta.jsonString,s.rid,meta.path);
     if(!['array','object'].includes(meta.type))bindValueCopy(value,s.rid,meta.path);
   if(typeof FieldMock!=='undefined')FieldMock.bind(value,selected?.rid===s.rid?selected:null,meta.path,meta.type,row);
     if(meta.type==='array'){

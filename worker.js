@@ -5,6 +5,12 @@ let seq = 0, retainedBytes = 0;
 const MAX_BYTES = 20 * 1024 * 1024, CACHE_BYTES = 80 * 1024 * 1024, MAX_RECORDS = 150;
 const typeOf = v => typeof v === 'bigint' ? 'number' : v === null ? 'null' : Array.isArray(v) ? 'array' : typeof v;
 const label = v => Array.isArray(v) ? `Array(${v.length})` : v && typeof v === 'object' ? `Object · ${Object.keys(v).length} 个字段` : String(v).slice(0,160);
+// Restrict parsing work on each rendered row to bounded, plausible JSON strings.
+function jsonStringKind(v){
+  if(typeof v!=='string' || v.length>1000000)return '';
+  const text=v.trim();if(!((text.startsWith('{') && text.endsWith('}')) || (text.startsWith('[') && text.endsWith(']'))))return '';
+  try{const parsed=JSON.parse(text);return Array.isArray(parsed)?'array':parsed && typeof parsed==='object'?'object':'';}catch{return '';}
+}
 function getAt(v,path=[]) { for(const key of path) { if(v == null || !Object.hasOwn(v,key)) throw Error('路径不存在'); v=v[key]; } return v; }
 // Bounded traversal: never stringify the entire subtree before truncation.
 function valuePreview(value) {
@@ -41,7 +47,7 @@ function viewerDocument(value,path=[]){
       const text=complex?label(v):typeof v==='string'?stringifyJson(v):String(v);
       chars+=text.length+String(current.at(-1)??'root').length;
       if(chars>LIMIT_CHARS)throw Error('内容超过 500,000 字符');
-      const meta={type,label:text,path:current};
+      const meta={type,label:text,path:current,jsonString:jsonStringKind(v)};
       if(complex){
         if(Array.isArray(v) && v.length>LIMIT_NODES-nodes)throw Error('节点超过 5,000 个');
         const keys=Object.keys(v);if(keys.length>LIMIT_NODES-nodes)throw Error('节点超过 5,000 个');
@@ -63,8 +69,8 @@ function viewerLabel(v,query=''){
 function children(v,path=[],offset=0,focusKey,query="") {
   const keys=v && typeof v==='object' ? Object.keys(v) : [];
   if(focusKey!==undefined){const index=keys.indexOf(String(focusKey));if(index<0)throw Error('定位字段不存在');offset=Math.floor(index/200)*200;}
-  return {type:typeOf(v),label:label(v),totalChildren:keys.length,offset,
-    children:keys.slice(offset,offset+200).map(k=>({key:Array.isArray(v)?Number(k):k,path:path.concat(Array.isArray(v)?Number(k):k),type:typeOf(v[k]),label:viewerLabel(v[k],query),preview:label(v[k])}))};
+  return {type:typeOf(v),label:label(v),jsonString:jsonStringKind(v),totalChildren:keys.length,offset,
+    children:keys.slice(offset,offset+200).map(k=>({key:Array.isArray(v)?Number(k):k,path:path.concat(Array.isArray(v)?Number(k):k),type:typeOf(v[k]),label:viewerLabel(v[k],query),preview:label(v[k]),jsonString:jsonStringKind(v[k])}))};
 }
 function arrays(v,path=[]) {
   const out=[],stack=[{v,path}], LIMIT=100000;let visited=0;
@@ -131,7 +137,7 @@ function table(v,{page=1,pageSize=100,query='',sortKey=null,dir=1,all=false,prev
       const hit=value.toLowerCase().indexOf(q);
       if(hit>=0){const start=Math.max(0,hit-8),end=Math.min(value.length,Math.max(start+160,hit+Math.min(q.length,160)));text=(start?'…':'')+value.slice(start,end)+(end<value.length?'…':'');}
     }
-    return [c,{type:typeOf(value),text,path:cellPath,matched,expand:complex || typeof value==='string' && (value.length>24 || /[\r\n]/.test(value))}];
+    return [c,{type:typeOf(value),text,path:cellPath,matched,jsonString:jsonStringKind(value),expand:complex || typeof value==='string' && (value.length>24 || /[\r\n]/.test(value))}];
   })))};
 
 }
@@ -202,7 +208,7 @@ function viewerExpansion(rec,data){
     const segment=segments[i];
     for(let index=segment.start+Math.max(0,position-segment.offset);index<segment.end && rows.length<limit;index++,position++){
       const {value,path}=state.rows[index];
-      rows.push({index,path,type:typeOf(value),label:viewerLabel(value,data.query||''),expanded:value!==null && typeof value==='object' && !state.collapsed.has(index)});
+      rows.push({index,path,type:typeOf(value),label:viewerLabel(value,data.query||''),jsonString:jsonStringKind(value),expanded:value!==null && typeof value==='object' && !state.collapsed.has(index)});
     }
   }
   return {start,total,rows,...expansionSummary(state)};
@@ -231,7 +237,7 @@ self.onmessage=e=>{
       const obj=parseJsonExact(raw),rid=String(++seq),evicted=[];
       while(records.size>=MAX_RECORDS || retainedBytes+bytes>CACHE_BYTES) {const first=records.keys().next().value;remove(first);evicted.push(first);}
       records.set(rid,{obj,raw,bytes});retainedBytes+=bytes;
-      result={rid,type:typeOf(obj),label:label(obj),evicted,bytes};
+      result={rid,type:typeOf(obj),label:label(obj),jsonString:jsonStringKind(obj),evicted,bytes};
     } else if(cmd==='clear') {records.clear();retainedBytes=0;result=true;}
     else if(cmd==='release') {remove(e.data.rid);result=true;}
     else {

@@ -40,6 +40,20 @@
         <div class="appearance-footer"><span id="appearanceStatus" role="status" aria-live="polite">设置仅影响当前扩展的外观</span><button id="appearanceReset" class="btn ghost">恢复默认</button></div>
       </div>
     </details>
+    <details id="displayMenu" class="display-menu">
+      <summary id="displayToggle" class="btn ghost appearance-toggle" aria-controls="displayPanel" title="数据展示与转换"><span aria-hidden="true">⇄</span> 数据显示</summary>
+      <div id="displayPanel" class="appearance-panel display-panel" aria-label="数据显示设置">
+        <div class="appearance-heading"><div><strong>数据显示</strong><p>转换仅影响展示，不改变原始数据</p></div><button id="displayClose" class="icon-btn" aria-label="关闭数据显示设置">×</button></div>
+        <fieldset><legend>显示转换</legend>
+          <label class="appearance-check"><input id="timestampDisplay" type="checkbox"> 时间戳显示为本地时间</label>
+          <p class="display-help">识别 2000–2100 年的 10 位秒或 13 位毫秒时间戳，按本地时区显示。</p>
+          <label class="appearance-check"><input id="jsonStringDisplay" type="checkbox"> JSON 字符串结构化</label>
+          <p class="display-help">可展开有效的对象或数组字符串；复制仍使用原始字符串。</p>
+          <label class="appearance-check"><input id="emptyDisplay" type="checkbox"> 突出显示空值</label>
+          <p class="display-help">区分 null、空字符串、空数组与空对象。</p>
+        </fieldset>
+      </div>
+    </details>
   </header>
 
   <div id="responseMockBar" class="response-mock-bar hidden" role="status"><span id="responseMockSummary"></span><button id="responseMockRefresh" class="btn ghost">更新状态</button><button id="responseMockStopAll" class="btn ghost">停用全部替换</button></div>

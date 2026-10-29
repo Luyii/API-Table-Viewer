@@ -50,6 +50,7 @@ npm test
 | 命令 | 当前覆盖范围 |
 | --- | --- |
 | `npm run test:regression` | 103 项主回归：解析、精度、路径、表格、搜索、导出、缓存、异步状态、捕获启动与虚拟列表 |
+| `node tests/display-conversion.cjs` | 数据显示转换、分页、搜索和原始数据检查 |
 | `npm run test:selection` | 8 项测试选择规则检查，覆盖范围缩小、依赖扩散、去重与保守回退 |
 | `npm run test:docs` | 仓库 Markdown 的本地链接、锚点与一级标题检查 |
 | `npm run test:capture` | 10 项捕获启动集成检查：完整 HTML 脚本顺序、DOM 就绪分支、无交互捕获、localhost、重复注册、HAR / 正文失败和清空竞态 |

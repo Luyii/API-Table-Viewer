@@ -61,8 +61,8 @@ async function navigateViewer(path,{targetPath=null,forceLazy=false,collapsed=fa
     if(viewerState===s && s.version===version && s.focusRow)s.focusRow.scrollIntoView({block:"center",inline:"nearest",behavior:"auto"});
   } else if(doc.complete){
     appendViewerContentActions(host,s,path);
-    const text=document.createElement('pre');text.className='viewer-scalar';highlightText(text,doc.text,s.query);host.appendChild(text);
-    bindValueCopy(text,s.rid,path);
+    const text=document.createElement('pre');text.className='viewer-scalar';timestampValue(text,doc.text,doc.meta.type,s.query);host.appendChild(text);
+    bindValueCopy(text,s.rid,path);addJsonStringButton(host,doc.meta.jsonString,s.rid,path);
     if(typeof FieldMock!=='undefined')FieldMock.bind(text,selected?.rid===s.rid?selected:null,path,doc.meta.type);
     const mark=text.querySelector('mark');if(mark)mark.scrollIntoView({block:'nearest',inline:'nearest'});
   } else await viewerScalar(path,-1,s,version);
@@ -101,7 +101,8 @@ async function viewerNode(meta,path,parent,auto=false,targetPath=null){
   }
   const toggle=viewerButton(expandable?'▶':'·',()=>load(0));toggle.disabled=!expandable;row.appendChild(toggle);
   const key=document.createElement('span');key.className='viewer-key';highlightText(key,path.length?String(path.at(-1)):'root',s.query);row.appendChild(key);
-  const value=document.createElement('span');value.className='viewer-value type-'+meta.type;highlightText(value,meta.label,s.query);row.appendChild(value);
+  const value=document.createElement('span');value.className='viewer-value type-'+meta.type;timestampValue(value,meta.label,meta.type,s.query);row.appendChild(value);
+  addJsonStringButton(row,meta.jsonString,s.rid,path);
   if(!['array','object'].includes(meta.type))bindValueCopy(value,s.rid,path);
   if(typeof FieldMock!=='undefined')FieldMock.bind(value,selected?.rid===s.rid?selected:null,path,meta.type,row);
   const bulk=meta.type==='array'?arrayBulkButton():null;if(bulk)row.appendChild(bulk);
