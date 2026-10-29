@@ -9,7 +9,7 @@
   },
   "scripts": {
     "preview": "node tests/preview/server.cjs",
-    "test": "node tests/regression.cjs && node tests/display-conversion.cjs && node tests/package-check.cjs && npm run test:capture && npm run test:selection && npm run test:docs && npm run test:fixtures && npm run test:mock && npm run test:preview && npm run test:fields && npm run test:appearance",
+    "test": "node tests/regression.cjs && node tests/display-conversion.cjs && node tests/release-metadata.cjs && node tests/package-check.cjs && npm run test:capture && npm run test:selection && npm run test:docs && npm run test:fixtures && npm run test:mock && npm run test:preview && npm run test:fields && npm run test:appearance",
     "test:regression": "node tests/regression.cjs",
     "test:package": "node tests/package-check.cjs",
     "test:manual": "node tests/manual/server.cjs",
